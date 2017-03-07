@@ -42,9 +42,67 @@ If so - needs to be analyzed first and the down sampling algorithm be adjusted
 Should the quality of the reads in the selection be preserved?
 Perhaps yes. Although such would add considerably to the work, it will improve the bias/accuracy of the simulation
 I was told that the raw data reads have been aligned. Have they been sorted and converted to bam? Or are they kept as unsorted sam files?
+Do we need reference genome and reference annotation when performing assemblies?
+How do i separate genes in the alignment
+What is the best method besides TPM of comparing assemblies
 
 Possible resources:
 Down sampling:
 https://www.biostars.org/p/154220/
+This one looks very promising: https://software.broadinstitute.org/gatk/documentation/tooldocs/current/org_broadinstitute_gatk_engine_CommandLineGATK.php#--downsample_to_coverage
+Search for:
+ --downsample_to_coverage / -dcov
+ --downsample_to_fraction / -dfrac
+ --downsampling_type / -dt
+ Other resources with few useful downsampling suggestions:
+ https://www.biostars.org/p/145820
+ Bam Parser:
+ https://github.com/gatoravi/bam-parser-tutorial/blob/master/parse_bam_from_start.cc
+ reservoir sampling - it seems that this particular method would be the best one to begin (without taking into account any statistical inferences or making any statistical assumptions)
+ Coverage estimation (depth calculation)
+ This python script might come useful in future - http://www.danielecook.com/calculate-depth-coverage-bam-file/
+ Manually such can be accomplished by running “samtools depth” or “samtools mpileup”
+ Yet another downsampling implementation in Python:
+ https://github.com/polyactis/vervet-web/blob/a550680f83d4c0c524734ee94bdd540c40f3a537/src/genotyping/DownsampleAlignmentToTrioCallWorkflow.py
+ Yet another approach to downsampling which seems to be recommended by many
 
+ So at this point it seems there are several simple options before we dig any deeper:
+ We can break a file into two parts:
+ Sam files would easily break into header and body parts and then body can be shuffled and the header reattached as necessary. However, the problem with sam files is that they are computationally more expensive
+ For the bam and cram files there should technically also be a method for detaching the header information, and it would me more sense to use them
+ However right now i would stick with sam and increasing complexity step-by-step
+
+ Things done:
+ To index a cram file (necessary in order to view a specific region):
+ Samtools index ...cram
+ To get the stats for the file:
+ Samtools stats ...cram > SAMstats.txt
+
+ A somewhat more concrete plan:
+ PHASE ONE
+ Reorganize stringtie assembly script to start with alignments
+ Make sure it completes the assemblies correctly
+ Begin sampling/scaling using the -s method provided with the samtools view
+ First apply the -s method with int “1” which should not eliminate any sequence data (VERIFY), and make sure the assembly is identical.
+ Then scale down and apply the assembly to notice any changes
+ Use the stringtie to assemble it correctly
+ Write a shell/python script to calculate TPM (Automatically reported by stringtie)
+ Develop a python seaborn script to draw the variance/SD diagram
+ Two types of diagrams at first:
+ The one proposed by Dr. Salzberg
+ The one used as an illustration to the TPM vs FPKM vs RPKM article/explanation
+ Some additional statistical tools could be ANOVA test
+ After everything is done - Perform an alignment with HISAT2 to see how well the new assembly compares to the full coverage one.
+ PHASE TWO:
+ Write custom algorithm to perform sampling based on statistical information about distribution
+ Such algorithm must preserve the distribution of read coverage when scaling
+ Also include an option to only apply scaling to the meaningful excerpts (coding data)
+ Perhaps also consider estimation of transcript abundance and comparison between runs with downsampled coverage
+ Also it appears that the genes.tab, which also includes TPM/FPKM/Coverage etc information about individual genes is tab delimited, which means it can be easily ported into pandas if necessary
+ Also we can plot/gather data about other parameters such as:
+ SNP (can be done from the aligned assembly via samtools mpileup)
+
+
+ Notes:
+ One assembly took ~17min
 
