@@ -1,0 +1,50 @@
+Draft Plan:
+Use Flux Simulator to generate 150 million 75-bp paired-end reads, extracted from all RefSeq human transcripts as provided by the UCSC Genome Browser.
+Think about what the read length should be
+Perhaps run multiple simulations of varying read length - only if it is possible that there is a correlation between the read-length and coverage effectiveness, which really there should be
+Think of the different read distributions
+Define what you mean by correct assembly:
+In the publication “StringTie enable improved reconstruction” on page 292 in nature biotechnology journal
+Perhaps the definition in this particular case should be a bit more stringent
+
+FPKM Formulation:
+So I have tried to do a back of the envelope calculation on a gene that has a very low FPKM as reported by Cufflinks. This gene's total combined exons are ~3 kb. It has ~2000 reads aligned by Tophat and the dataset has ~24 million reads in total.
+2000/(3000*2.4e7) ~ 28
+
+Use TPM as the measurement:
+https://haroldpimentel.wordpress.com/2014/05/08/what-the-fpkm-a-review-rna-seq-expression-units/
+A good publication for ready code
+Read alignment already done
+For each gene in the alignment randomly select a certain number of reads
+For the actual selection of reads for coverage scaling:
+Begin with nucleotide-by-nucleotide approach.
+Start at first nucleotide and see the total number of reads that have align with that nucleotide
+Randomly choose the appropriate number of reads from those
+Remember the reads and keep extending the reads until the first read is over. In which case choose a new read randomly which corresponds to the last/first new nucleotide:
+So this is a gray area:
+One approach could be to perhaps even roll back a few nucleotides (but how many) and select a new read earlier. So that it does not make the algorithm too sequential.
+Second option would be to continue with what is available until several reads are over and then choose a median point between the ends to use as a new point:
+Need to think how to find this new point
+Pull out the region of interest from the BAM file:
+Questions:
+How to select the region of interest? What should be considered a region of interest? Should that be a gene?
+Likely to use pysam for the task:
+Can work with SAM/BAM files interchangeably although at the moment BAM makes more sense
+Questions to consider:
+Should be be downscaling khmers or fragments/reads?:
+I guess reads would be more appropriate for the task and closer to the real data.
+Although scaling down kmers would provide more accurate representation for the less error technologies
+But yeah, certainly should begin with reads.
+Are these paired-end or single-end reads?
+What if a region has a very low coverage? Are we to immediately begin at a uniform coverage value for all genes? Or are we to do the proportionally?
+Should the distribution of reads within a particular excerpt (read gene) be preserved?:
+If so - needs to be analyzed first and the down sampling algorithm be adjusted
+Should the quality of the reads in the selection be preserved?
+Perhaps yes. Although such would add considerably to the work, it will improve the bias/accuracy of the simulation
+I was told that the raw data reads have been aligned. Have they been sorted and converted to bam? Or are they kept as unsorted sam files?
+
+Possible resources:
+Down sampling:
+https://www.biostars.org/p/154220/
+
+
