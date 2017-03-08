@@ -2,6 +2,19 @@
 
 # ./wrapper.py -i SRR821573.cram -r 0.1:0.9:0.1 -a /scratch0/genomes/hg38/annotation/hg38_p8.biotype_flt.cls.gff3 -e /scratch0/genomes/hg38/hg38.fa
 
+
+# another useful command for selecting protein coding genes form the annotation
+# awk -F "\t" '$3 == "gene" {print $9}' hg38_p8.biotype_flt.cls.gff3 | awk -F ";" '$7 == "gene_biotype=protein_coding"'
+
+# Another useful command which allows outputting only the reads that were mapped
+# samtools view -F 4 -C -t /scratch0/genomes/hg38/hg38.fa SRR821573.cram > SRR821573.MAPPED.cram
+
+# Another command for generating an output of only high-quality (>50) information as a pileup with a reference
+# samtools mpileup -C50 -gf /scratch0/genomes/hg38/hg38.fa SRR821573.cram > pileup
+
+# perhaps the previous 2 commands could be combined with a pipe for a slight increase in performance - likely to be negligible
+
+
 import os
 import argparse
 import sys
@@ -188,7 +201,7 @@ def main(argv):
                     expiredPID = os.wait()
                     print("EXPIRED: ",expiredPID)
                     childPIDS.remove((os.getpid(),expiredPID[0]))
-                    
+
             while(len(childPIDS) > 0):
                 expiredPID = os.wait()
                 print("FINAL EXPIRATION: ",expiredPID)
