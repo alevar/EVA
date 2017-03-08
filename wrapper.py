@@ -7,37 +7,59 @@ import argparse
 import sys
 import subprocess
 
+# This function shall calculate the correct number of:
+# 1. forks to maintain simultaneously
+# 2. threads to allocate to each fork
+def CalcNumThreads():
+    cpuinfo = open('/proc/cpuinfo','r')
+    forkNum = 0
+    for line in cpuinfo:
+        try:
+            if line.split()[0] == "siblings":
+                forkNum = line.split()[2]/2
+                if forkNum == 0:
+                    forkNum = 1
+        except:
+            pass
+
+    return forkNum # needs to be something else
+
 def xfrange(start, stop, step):
     i = 0
     while start + i * step < stop:
         yield start + i * step
         i += 1
 
-def main(argv):
+# This function will be used in order to verify whether the input information is submitted in bulk or as a single piece and process the information accordingly
+def checkDirFile(inStr):
+    toAnalyze = []
+    rootDir = os.popen("pwd").read()[:-1]
 
-    # For MARCC need to add parallelization within this wrapper:
-    # this level of paralellization will allow running the wrapper simultaneously on multiple tissue samples (read as input files).
-    # perhaps do it simply by system forking the process - is very likely to be the most efficient way of doing it
-
-    def child():
-    # Child should receive its own pseudo-terminal for proper threading of the application
-        return
-
-    def parent(inputs):
-        # while ( we parse through the list of tissue alignments to analyze )
-        while(len(inputs) != 0):
-            newpid = os.fork()
-            if newpid == 0:
-                child()
+    if os.path.isdir(inStr):
+        for d in os.listdir(inStr):
+            if not os.path.isdir(d):
+                # is directory. compile a list of all files with full paths
+                toAnalyze.append(os.path.abspath(inStr+"/"+d))
             else:
-                print("hola", os.getpid(),newpid)
+                # Needs to raise an exception
+                return "ERROR"
+        return toAnalyze
+    else:
+        return inStr
+
+def main(argv):
 
     curPath = os.path.dirname(os.path.realpath(__file__))
 
-# Arguments to consider adding in future:
-# 1. Directory with all input alignments
-# 2. Directory with all input reference annotations
-# 3. Directory with all input reference sequences for samtools to be able to view the CRAM files correctly
+    # globals
+    threads = CalcNumThreads()
+    forkNum = threads
+    outLog = curPath+"wrapper.log"
+
+    # Arguments to consider adding in future:
+    # 1. Directory with all input alignments
+    # 2. Directory with all input reference annotations
+    # 3. Directory with all input reference sequences for samtools to be able to view the CRAM files correctly
 
     parser = argparse.ArgumentParser(description='''Help Page''')
     parser.add_argument('-i','--input',required=True,type=str,help="path to the CRAM allignment which is to be used in coverage efficacy analysis by downsampling")
@@ -46,9 +68,11 @@ def main(argv):
     parser.add_argument('-a','--annotation',required=True,type=str,help="Provide the path to the reference annotation")
     parser.add_argument('-e','--reference',required=True,type=str,help="Provide path to the referernce sequence in fasta format which will be used in order to transalate CRAM into SAM and feed it into the stringtie for assembly")
     parser.add_argument('-t','--threads',type=int,help="Indicate the maximum number of threads to be used by the pipeline")
+    parser.add_argument('-f','--forks',type=int,help="Indicate the maximum numberof forks to maintain at the same time. Each fork will receive either precalculated or predefined by -t number of threads")
+    # possible need to specify output path
 
     args=parser.parse_args()
-    inCRAM = args.input
+    inputs = args.input
     assert len(args.range.split(":"))==3
     covRange = [float(args.range.split(":")[0]),float(args.range.split(":")[1]),float(args.range.split(":")[2])]
 
@@ -65,33 +89,69 @@ def main(argv):
     else:
         threads = 1
 
-# Add parsing of the filename
-    baseDirName = inCRAM.split("/")[-1].split(".cram")[0]
+    # For MARCC need to add parallelization within this wrapper:
+    # this level of paralellization will allow running the wrapper simultaneously on multiple tissue samples (read as input files).
+    # perhaps do it simply by system forking the process - is very likely to be the most efficient way of doing it
+
+    def child(path):
+    # Child should receive its own pseudo-terminal for proper threading of the application
+        # Add parsing of the filename
+        baseDirName = path.split("/")[-1].split(".")[:-1][0]
+
+        if(not os.path.exists(curPath+"/downsamp/"+baseDirName)):
+            os.makedirs(curPath+"/downsamp/"+baseDirName)
+        for i in xfrange(covRange[0],covRange[1],covRange[2]):
+            if(os.path.exists(curPath+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")):
+                os.system("rm -r downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")
+
+        if(not os.path.exists(curPath+"/assembly/"+baseDirName)):
+            os.makedirs(curPath+"/assembly/"+baseDirName)
+        for i in xfrange(covRange[0],covRange[1],covRange[2]):
+            if(os.path.exists(curPath+"/assembly/"+baseDirName+"/"+baseDirName+str(i))):
+                os.system("rm -r assembly/"+baseDirName+"/"+baseDirName+str(i))
+            os.makedirs(curPath+"/assembly/"+baseDirName+"/"+baseDirName+str(i))
+
+        if(not os.path.exists(curPath+"/statsAl/"+baseDirName)):
+            os.makedirs(curPath+"/statsAl/"+baseDirName)
+        for i in xfrange(covRange[0],covRange[1],covRange[2]):
+            if(os.path.exists(curPath+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))):
+                os.system("rm -r statsAl/"+baseDirName+"/"+baseDirName+str(i))
+            os.makedirs(curPath+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))
+
+        # Exit after the process is over
+        os._exit(0)
+
+    def parent(inputs):
+        # the block below is responsible for creating the base directories
+        # Again, need to integrate an output parameter passing and if specified create basedir in accordance with the output parameter
+        if(not os.path.exists(curPath+"/downsamp")):
+            os.makedirs(curPath+"/downsamp/")
+        if(not os.path.exists(curPath+"/assembly")):
+            os.makedirs(curPath+"/assembly/")
+        if(not os.path.exists(curPath+"/statsAl")):
+            os.makedirs(curPath+"/statsAl/")
+
+        theorizedForkNum = CalcNumThreads() # Calculates the number of forks to make
+        if args.forks is not None and args.forks <= theorizedForkNum*2 # safeguards against excessive forking
+            forkNum = args.forks
+        else:
+            forkNum = theorizedForkNum
+
+        inputAls = checkDirFile(inputs)
+        childPIDS = [] # list to be populated with the fork PIDS
+        # while ( we parse through the list of tissue alignments to analyze )
+        while(len(inputAls) != 0): # need to creating waiting for the process PIDs to finish before forking again
+            newpid = os.fork()
+            path = inputAls.pop()
+            if newpid == 0:
+                child(path)
+            else:
+                childPIDS.append((os.getpid(),newpid))
+                print(childPIDS)
+
+    parent(inputs)
 
     # Perhaps also add a step to break the alignment into functional pieces based on the reference, so that separate directories/files may be created for different genes. Analysis will be much faster and perhaps easier
-
-    if(not os.path.exists(curPath+"/downsamp")):
-        os.makedirs(curPath+"/downsamp/")
-        os.makedirs(curPath+"/downsamp/"+baseDirName)
-    for i in xfrange(covRange[0],covRange[1],covRange[2]):
-        if(os.path.exists(curPath+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")):
-            os.system("rm -r downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")
-
-    if(not os.path.exists(curPath+"/assembly")):
-        os.makedirs(curPath+"/assembly/")
-        os.makedirs(curPath+"/assembly/"+baseDirName)
-    for i in xfrange(covRange[0],covRange[1],covRange[2]):
-        if(os.path.exists(curPath+"/assembly/"+baseDirName+"/"+baseDirName+str(i))):
-            os.system("rm -r assembly/"+baseDirName+"/"+baseDirName+str(i))
-        os.makedirs(curPath+"/assembly/"+baseDirName+"/"+baseDirName+str(i))
-
-    if(not os.path.exists(curPath+"/statsAl")):
-        os.makedirs(curPath+"/statsAl/")
-        os.makedirs(curPath+"/statsAl/"+baseDirName)
-    for i in xfrange(covRange[0],covRange[1],covRange[2]):
-        if(os.path.exists(curPath+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))):
-            os.system("rm -r statsAl/"+baseDirName+"/"+baseDirName+str(i))
-        os.makedirs(curPath+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))
 
     if args.stats is not None:
         open(outLog,'a').close()
