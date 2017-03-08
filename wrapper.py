@@ -10,18 +10,18 @@ import subprocess
 # This function shall calculate the correct number of:
 # 1. forks to maintain simultaneously
 # 2. threads to allocate to each fork
-def CalcNumThreads():
+def CalcNumThreads(requestedTreads):
     cpuinfo = open('/proc/cpuinfo','r')
     forkNum = 0
     for line in cpuinfo:
         try:
             if line.split()[0] == "siblings":
-                forkNum = line.split()[2]/2
+                forkNum = line.split()[2]/2/requestedTreads
                 if forkNum == 0:
                     forkNum = 1
         except:
             pass
-
+    cpuinfo.close()
     return forkNum # needs to be something else
 
 def xfrange(start, stop, step):
@@ -45,16 +45,14 @@ def checkDirFile(inStr):
                 return "ERROR"
         return toAnalyze
     else:
-        return inStr
+        return [inStr]
 
 def main(argv):
 
     curPath = os.path.dirname(os.path.realpath(__file__))
+    outDir = curPath
 
-    # globals
-    threads = CalcNumThreads()
-    forkNum = threads
-    outLog = curPath+"wrapper.log"
+    threads = 1
 
     # Arguments to consider adding in future:
     # 1. Directory with all input alignments
@@ -69,6 +67,7 @@ def main(argv):
     parser.add_argument('-e','--reference',required=True,type=str,help="Provide path to the referernce sequence in fasta format which will be used in order to transalate CRAM into SAM and feed it into the stringtie for assembly")
     parser.add_argument('-t','--threads',type=int,help="Indicate the maximum number of threads to be used by the pipeline")
     parser.add_argument('-f','--forks',type=int,help="Indicate the maximum numberof forks to maintain at the same time. Each fork will receive either precalculated or predefined by -t number of threads")
+    parser.add_argument('-o','--out',type=str,help="Directory where all the output will be saved")
     # possible need to specify output path
 
     args=parser.parse_args()
@@ -89,6 +88,18 @@ def main(argv):
     else:
         threads = 1
 
+    forkNum = CalcNumThreads(threads)
+
+    if args.stats is not None:
+        open(outLog,'a').close()
+        print("Your stats log is created in"+outLog)
+    else:
+        open(outDir+"/stats.log",'a').close()
+        print("The default log was created in"+outDir+"/stats.log")
+
+    if args.out is not None and os.path.isdir(args.out):
+        outDir = args.out
+
     # For MARCC need to add parallelization within this wrapper:
     # this level of paralellization will allow running the wrapper simultaneously on multiple tissue samples (read as input files).
     # perhaps do it simply by system forking the process - is very likely to be the most efficient way of doing it
@@ -98,25 +109,50 @@ def main(argv):
         # Add parsing of the filename
         baseDirName = path.split("/")[-1].split(".")[:-1][0]
 
-        if(not os.path.exists(curPath+"/downsamp/"+baseDirName)):
-            os.makedirs(curPath+"/downsamp/"+baseDirName)
+        if(not os.path.exists(outDir+"/downsamp/"+baseDirName)):
+            os.makedirs(outDir+"/downsamp/"+baseDirName)
         for i in xfrange(covRange[0],covRange[1],covRange[2]):
-            if(os.path.exists(curPath+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")):
-                os.system("rm -r downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")
+            if(os.path.exists(outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")):
+                os.system("rm -r "+outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")
 
-        if(not os.path.exists(curPath+"/assembly/"+baseDirName)):
-            os.makedirs(curPath+"/assembly/"+baseDirName)
+        if(not os.path.exists(outDir+"/assembly/"+baseDirName)):
+            os.makedirs(outDir+"/assembly/"+baseDirName)
         for i in xfrange(covRange[0],covRange[1],covRange[2]):
-            if(os.path.exists(curPath+"/assembly/"+baseDirName+"/"+baseDirName+str(i))):
-                os.system("rm -r assembly/"+baseDirName+"/"+baseDirName+str(i))
-            os.makedirs(curPath+"/assembly/"+baseDirName+"/"+baseDirName+str(i))
+            if(os.path.exists(outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(i))):
+                os.system("rm -r "+outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(i))
+            os.makedirs(outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(i))
 
-        if(not os.path.exists(curPath+"/statsAl/"+baseDirName)):
-            os.makedirs(curPath+"/statsAl/"+baseDirName)
+        if(not os.path.exists(outDir+"/statsAl/"+baseDirName)):
+            os.makedirs(outDir+"/statsAl/"+baseDirName)
         for i in xfrange(covRange[0],covRange[1],covRange[2]):
-            if(os.path.exists(curPath+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))):
-                os.system("rm -r statsAl/"+baseDirName+"/"+baseDirName+str(i))
-            os.makedirs(curPath+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))
+            if(os.path.exists(outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))):
+                os.system("rm -r "+outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))
+            os.makedirs(outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))
+
+        # Perhaps also add a step to break the alignment into functional pieces based on the reference, so that separate directories/files may be created for different genes. Analysis will be much faster and perhaps easier
+
+        # also do not forget to create a separate directory for a base assembly
+        # perhaps just save it in the root of each directory where all the subdirs for downsampled assemblies are
+
+        #==============================================
+        #first run the base assembly as described above
+        #==============================================
+
+
+        # print("==================================")
+        # print(sequenceRef)
+        # print("==================================")
+        assembleFullCov = "samtools view -h -T "+os.path.abspath(sequenceRef)+" "+path+" | stringtie -p "+str(threads)+" -m 150 -G "+os.path.abspath(annotationRef)+" -o "+outDir+"/assembly/"+baseDirName+"/"+baseDirName+".gtf -A "+outDir+"/assembly/"+baseDirName+"/Genes.tab -"
+        os.system(assembleFullCov)
+
+        # Now lets write the first downsampling method using samtools
+        for i in xfrange(covRange[0],covRange[1],covRange[2]):
+            downSampleCmd = "samtools view -h -s "+str(i)+" -C "+path+" > "+outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram"
+            os.system(downSampleCmd)
+
+
+        # for each child Fork create a temporary log in its location so that information can be saved sequentially
+        # At the end of all the child processes unify all the temp logs into a single comprehensive under the parent thread
 
         # Exit after the process is over
         os._exit(0)
@@ -124,15 +160,15 @@ def main(argv):
     def parent(inputs):
         # the block below is responsible for creating the base directories
         # Again, need to integrate an output parameter passing and if specified create basedir in accordance with the output parameter
-        if(not os.path.exists(curPath+"/downsamp")):
-            os.makedirs(curPath+"/downsamp/")
-        if(not os.path.exists(curPath+"/assembly")):
-            os.makedirs(curPath+"/assembly/")
-        if(not os.path.exists(curPath+"/statsAl")):
-            os.makedirs(curPath+"/statsAl/")
+        if(not os.path.exists(outDir+"/downsamp")):
+            os.makedirs(outDir+"/downsamp/")
+        if(not os.path.exists(outDir+"/assembly")):
+            os.makedirs(outDir+"/assembly/")
+        if(not os.path.exists(outDir+"/statsAl")):
+            os.makedirs(outDir+"/statsAl/")
 
-        theorizedForkNum = CalcNumThreads() # Calculates the number of forks to make
-        if args.forks is not None and args.forks <= theorizedForkNum*2 # safeguards against excessive forking
+        theorizedForkNum = CalcNumThreads(threads) # Calculates the number of forks to make
+        if args.forks is not None and args.forks <= theorizedForkNum*2: # safeguards against excessive forking
             forkNum = args.forks
         else:
             forkNum = theorizedForkNum
@@ -144,35 +180,23 @@ def main(argv):
             newpid = os.fork()
             path = inputAls.pop()
             if newpid == 0:
-                child(path)
+                child(os.path.abspath(path))
             else:
                 childPIDS.append((os.getpid(),newpid))
-                print(childPIDS)
+                print("PARENT: NEW CHILD CREATED: ",childPIDS)
+                if len(childPIDS) >= forkNum:
+                    expiredPID = os.wait()
+                    print("EXPIRED: ",expiredPID)
+                    childPIDS.remove((os.getpid(),expiredPID[0]))
+                    
+            while(len(childPIDS) > 0):
+                expiredPID = os.wait()
+                print("FINAL EXPIRATION: ",expiredPID)
+                childPIDS.remove((os.getpid(),expiredPID[0]))
+
+        # The parent currently exits before the child ends the process. Parent needs to wait for all childrent to finish
 
     parent(inputs)
-
-    # Perhaps also add a step to break the alignment into functional pieces based on the reference, so that separate directories/files may be created for different genes. Analysis will be much faster and perhaps easier
-
-    if args.stats is not None:
-        open(outLog,'a').close()
-        print("Your stats log is created in"+outLog)
-    else:
-        open(curPath+"stats.log",'a').close()
-        print("The default log was created in"+curPath+"stats.log")
-
-# also do not forget to create a separate directory for a base assembly
-# perhaps just save it in the root of each directory where all the subdirs for downsampled assemblies are
-
-#==============================================
-#first run the base assembly as described above
-#==============================================
-    #assembleFullCov = "samtools view -h -T "+sequenceRef" "+inCRAM+" | stringtie -p "+str(threads)+" -m 150 -G "+annotationRef+" -o ./assembly/"+baseDirName+"/"+baseDirName+".gtf -A ./assembly/"+baseDirName+"/Genes.tab -"
-    #os.system(assembleFullCov)
-
-    # Now lets write the first downsampling method using samtools
-    for i in xfrange(covRange[0],covRange[1],covRange[2]):
-        downSampleCmd = "samtools view -h -s "+str(i)+" -C "+inCRAM+" > ./downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram"
-        os.system(downSampleCmd)
 
 # also important to create a safeguard for threading:
 # if the user specifies 8 threads to be used, the script meeds to analyze the max available and how muchforking will be done and calculate the number of threads to be allocated per fork (read for stringtie)
