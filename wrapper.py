@@ -20,6 +20,10 @@ import argparse
 import sys
 import subprocess
 
+# The following function will be used to verify the necessary software is installed and configured
+def verifySoftware():
+    pass
+
 # The function below will be used to parse the alignment and identify regions of high coverage which correspond to exons
 # The information will then be used to downsample and calculate the statistics
 def isolateHighCoverage(path):
