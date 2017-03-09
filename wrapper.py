@@ -20,6 +20,21 @@ import argparse
 import sys
 import subprocess
 
+# The function below will be used to parse the alignment and identify regions of high coverage which correspond to exons
+# The information will then be used to downsample and calculate the statistics
+def isolateHighCoverage(path):
+    pass
+
+# The function below will be used to calculate the statistics
+def calcStats():
+    pass
+
+# The followingi tab delimited format will be used to save tpm information
+# @<GENE NAME>  <BASE COVERAGE>
+# <GTEX TISSUE TYPE> <BASE COVERAGE (factor = 1.0)>    <TPM>
+# <GTEX TISSUE TYPE> <FACTOR>  <TPM>
+# etc
+
 # This function shall calculate the correct number of:
 # 1. forks to maintain simultaneously
 # 2. threads to allocate to each fork
