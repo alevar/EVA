@@ -30,6 +30,28 @@ import os
 import argparse
 import sys
 import subprocess
+import random
+
+#The following function will be used in order to randomly generate a sample .stat file similar to those outputed by the application
+# the funtion will create a sample.stat file in the current directory
+def randStat():
+    sampleStat = open('sample.stat','w')
+    for gene in range(10):
+        base_cov = random.randint(1,100)*100
+        base_TPM = random.randint(10,100)*20+random.randint(1,99)
+        HD = "@GENE"+str(gene)+"\t"+str(base_cov)+"\n"
+        sampleStat.write(HD)
+        print(HD)
+        for factor in xfrange(0.1,1.0,0.1):
+            coverageM = int(base_cov*factor)
+            coverage = random.randint(coverageM-int(0.01*coverageM),coverageM+int(0.01*coverageM))
+            for tissue in range(10):
+                for sample in range(10):
+                    TPM = random.randint(base_TPM-10*sample,base_TPM+10*sample)
+                    LN = "TISSUE"+str(tissue)+"\t"+str(sample)+"\t"+str(factor)+"\t"+str(coverage)+"\t"+str(TPM)+"\n"
+                    sampleStat.write(LN)
+            
+    sampleStat.close()
 
 # The following function will be used to verify the necessary software is installed and configured
 def verifySoftware():
