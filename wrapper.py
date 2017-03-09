@@ -14,6 +14,17 @@
 
 # perhaps the previous 2 commands could be combined with a pipe for a slight increase in performance - likely to be negligible
 
+# In order to make a tangible statistic we could:
+# 1. Write stat log individually for each tissue sample (since they will have different starting coverage)
+# 2. For each scaling factor (coverage point) calculate the box-plot quartile groups
+# The most important point is to somehow normalize the coverage and the TPM information (although TPM should not have to be normalized since it is a normalized value on its own)
+
+# The ideal graph for the analysis will be:
+# 1. mean line of the averages of tpm values for the current coverage
+# 2. darker-shade colored 2-nd&3-rd quartile groups of the TPM range
+# 3. lighter-shade colored 1-st&4-th quartile groups of the TPM range
+
+# Also do not forget about repeting the pipeline for each tissue-gene-etc run multiple times since the downsampling will be random
 
 import os
 import argparse
