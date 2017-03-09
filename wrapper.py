@@ -100,8 +100,11 @@ def main(argv):
     parser.add_argument('-t','--threads',type=int,help="Indicate the maximum number of threads to be used by the pipeline")
     parser.add_argument('-f','--forks',type=int,help="Indicate the maximum numberof forks to maintain at the same time. Each fork will receive either precalculated or predefined by -t number of threads")
     parser.add_argument('-o','--out',type=str,help="Directory where all the output will be saved")
-    # possible need to specify output path
 
+    # Not yet implemented
+    parser.add_argument('-n','-num',type=int,help="The number of genomic regions to be included in the analysis")
+    parser.add-argument('-w','--random',type=int,help="The number of random sampling repetitions to perform for each genomic region at each scaling factor")
+    
     args=parser.parse_args()
     inputs = args.input
     assert len(args.range.split(":"))==3
