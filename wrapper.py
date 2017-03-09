@@ -2,10 +2,38 @@
 
 # ./wrapper.py -i SRR821573.cram -r 0.1:0.9:0.1 -a /scratch0/genomes/hg38/annotation/hg38_p8.biotype_flt.cls.gff3 -e /scratch0/genomes/hg38/hg38.fa
 
+
+# another useful command for selecting protein coding genes form the annotation
+# awk -F "\t" '$3 == "gene" {print $9}' hg38_p8.biotype_flt.cls.gff3 | awk -F ";" '$7 == "gene_biotype=protein_coding"'
+
+# Another useful command which allows outputting only the reads that were mapped
+# samtools view -F 4 -C -t /scratch0/genomes/hg38/hg38.fa SRR821573.cram > SRR821573.MAPPED.cram
+
+# Another command for generating an output of only high-quality (>50) information as a pileup with a reference
+# samtools mpileup -C50 -gf /scratch0/genomes/hg38/hg38.fa SRR821573.cram > pileup
+
+# perhaps the previous 2 commands could be combined with a pipe for a slight increase in performance - likely to be negligible
+
+
 import os
 import argparse
 import sys
 import subprocess
+
+# The function below will be used to parse the alignment and identify regions of high coverage which correspond to exons
+# The information will then be used to downsample and calculate the statistics
+def isolateHighCoverage(path):
+    pass
+
+# The function below will be used to calculate the statistics
+def calcStats():
+    pass
+
+# The followingi tab delimited format will be used to save tpm information
+# @<GENE NAME>  <BASE COVERAGE>
+# <GTEX TISSUE TYPE> <BASE COVERAGE (factor = 1.0)>    <TPM>
+# <GTEX TISSUE TYPE> <FACTOR>  <TPM>
+# etc
 
 # This function shall calculate the correct number of:
 # 1. forks to maintain simultaneously
@@ -68,6 +96,7 @@ def main(argv):
     parser.add_argument('-t','--threads',type=int,help="Indicate the maximum number of threads to be used by the pipeline")
     parser.add_argument('-f','--forks',type=int,help="Indicate the maximum numberof forks to maintain at the same time. Each fork will receive either precalculated or predefined by -t number of threads")
     parser.add_argument('-o','--out',type=str,help="Directory where all the output will be saved")
+
     # Not yet implemented
     parser.add_argument('-n','-num',type=int,help="The number of genomic regions to be included in the analysis")
     parser.add-argument('-w','--random',type=int,help="The number of random sampling repetitions to perform for each genomic region at each scaling factor")
@@ -148,7 +177,6 @@ def main(argv):
         os.system(assembleFullCov)
 
         # Now lets write the first downsampling method using samtools
-        # Also allow the user to define how many best regions they would like to be included in the analysis
         for i in xfrange(covRange[0],covRange[1],covRange[2]):
             downSampleCmd = "samtools view -h -s "+str(i)+" -C "+path+" > "+outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram"
             os.system(downSampleCmd)
