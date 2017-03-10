@@ -55,7 +55,6 @@ def findGenes(path):
         # awk -F"\t|;" '$3 == "transcript" && match($11,/reference_id*/) {if(int(substr($14,7,length($14-1)) > 1000) print} ERR18XXXXX.gtf'
         pass
 
-
 # Also need to write a method which will take the final .stat file and produce a sorted one
 def sortStat():
     pass
@@ -82,6 +81,16 @@ def readStat(path):
 
     #plt.clf()
     #plt.hold(1)
+
+
+    # perhaps what we could also do is to plot the graph of not the actual values and their quartiles and means
+    # but rather use percentages and deviations from the original value
+    # That way we will begin at a zero point
+
+
+    # this line selects all that match
+    # print(statData[(statData["f0"] == "GENE0") & (statData["f4"] == 0.1)])
+
 
     # begins a loop for each unique region identifier in the 0th column
     xs = []
@@ -144,7 +153,7 @@ def randStat():
         base_cov = random.randint(1,100)*100
         base_TPM = random.randint(10,100)*20+random.randint(1,99)
         HD = "GENE"+str(gene)+"\t"+str(base_cov)
-        for factor in xfrange(0.1,1.02,0.02):
+        for factor in xfrange(0.1,1.0,0.1):
             coverageM = int(base_cov*factor)
             coverage = random.randint(coverageM-int(0.01*coverageM),coverageM+int(0.01*coverageM))
             for tissue in range(50):
@@ -152,7 +161,6 @@ def randStat():
                     TPM = random.randint(int(base_TPM*factor),base_TPM+(base_TPM-int(base_TPM*factor)))
                     LN = HD+"\tTISSUE"+str(tissue)+"\t"+str(sample)+"\t"+str(factor)+"\t"+str(coverage)+"\t"+str(TPM)+"\t"+str(base_TPM)+"\n"
                     sampleStat.write(LN)
-
     sampleStat.close()
 
 # The following function will be used to verify the necessary software is installed and configured
