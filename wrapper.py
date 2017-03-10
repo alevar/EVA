@@ -289,11 +289,18 @@ def main(argv):
         # Add parsing of the filename
         baseDirName = path.split("/")[-1].split(".")[:-1][0]
 
+        # if(not os.path.exists(outDir+"/downsamp/"+baseDirName)):
+        #     os.makedirs(outDir+"/downsamp/"+baseDirName)
+        # for i in xfrange(covRange[0],covRange[1],covRange[2]):
+        #     if(os.path.exists(outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")):
+        #         os.system("rm -r "+outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")
+
         if(not os.path.exists(outDir+"/downsamp/"+baseDirName)):
             os.makedirs(outDir+"/downsamp/"+baseDirName)
         for i in xfrange(covRange[0],covRange[1],covRange[2]):
-            if(os.path.exists(outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")):
-                os.system("rm -r "+outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")
+            if(os.path.exists(outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i))):
+                os.system("rm -r "+outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i))
+            os.makedirs(outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i))
 
         if(not os.path.exists(outDir+"/assembly/"+baseDirName)):
             os.makedirs(outDir+"/assembly/"+baseDirName)
@@ -337,16 +344,25 @@ def main(argv):
 # The snippet below is for current testing only
 # the final version will be slightly more elaborate
         gtf = "/scratch0/RNAseq_protocol/chrX_data/genes/chrX.gtf"
+
         for scalefactor in xfrange(covRange[0],covRange[1],covRange[2]):
             for rep in range(numReps):
-                finDir = outDir+"/downsamp/"+baseDirName+"/"
-                outName =finDir+baseDirName+"_F:"+str(scalefactor)+"_R:"+str(rep)
-                downSampleCmd = "samtools view -h -s "+str(scalefactor)+" "+path+" > "+outName+".sam"
-                sortCommand = "samtools view -S -b "+outName+".sam | samtools sort -@ "+str(threads)+" -o "+outName+".bam -"
-                assemCommand = "stringtie -p "+str(threads)+" -G "+gtf+" -o "+outName+".gtf -l "+outName+" "+outName+".bam"
-                mergeCommand0 = "ls -l "+finDir+"*.gtf > "+finDir+"mergelist.txt"
-                mergeCommand1 = "stringtie --merge -p "+str(threads)+" -G "+gtf+" -o "+finDir+"stringtie_merged.gtf "+finDir+"mergelist.txt"
-                mergeCommand2 = "stringtie -e -B -p "+str(threads)+" -G "+finDir+"stringtie_merged.gtf -o "+outName+".FIN.gtf "+outName+".bam"
+
+                finSampDir = outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
+                finAssemDir = outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
+                finStatDir = outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
+
+                outSampName =finSampDir+baseDirName+"_F:"+str(scalefactor)+"_R:"+str(rep)
+                outAssemName =finAssemDir+baseDirName+"_F:"+str(scalefactor)+"_R:"+str(rep)
+
+                downSampleCmd = "samtools view -h -s "+str(scalefactor)+" "+path+" > "+outSampName+".sam"
+                sortCommand = "samtools view -S -b "+outSampName+".sam | samtools sort -@ "+str(threads)+" -o "+outSampName+".bam -"
+                assemCommand = "stringtie -p "+str(threads)+" -G "+gtf+" -o "+outAssemName+".gtf -l "+outAssemName+" "+outSampName+".bam"
+                
+                mergeCommand0 = "ls -l "+outAssemName+".gtf > "+finStatDir+"mergelist_F:"+str(scalefactor)+"_R:"+str(rep)+".txt"
+                mergeCommand1 = "stringtie --merge -p "+str(threads)+" -G "+gtf+" -o "+finStatDir+"stringtie_merged_F:"+str(scalefactor)+"_R:"+str(rep)+".gtf "+finStatDir+"mergelist_F:"+str(scalefactor)+"_R:"+str(rep)+".txt"
+                mergeCommand2 = "stringtie -e -B -p "+str(threads)+" -G "+finStatDir+"stringtie_merged_F:"+str(scalefactor)+"_R:"+str(rep)+".gtf -o "+outAssemName+".FIN.gtf "+outSampName+".bam"
+                
                 print("BEGIN DOWNSAMPLING REP: "+str(rep))
                 os.system(downSampleCmd)
                 print("BEGIN SORTING")
