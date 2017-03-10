@@ -370,11 +370,21 @@ def main(argv):
                 os.system(sortCommand)
                 print("BEGIN ASSEM")
                 os.system(assemCommand)
+                os.system(mergeCommand0)
+                os.system(mergeCommand1)
+                os.system(mergeCommand2)
 
         # for each child Fork create a temporary log in its location so that information can be saved sequentially
         # At the end of all the child processes unify all the temp logs into a single comprehensive under the parent thread
 
         # Exit after the process is over
+
+        # for scalefactor in xfrange(covRange[0],covRange[1],covRange[2]):
+        #     for rep in range(numReps):
+        #         finSampDir = outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
+        #         finAssemDir = outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
+        #         finStatDir = outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
+
         os._exit(0)
 
     def parent(inputs):
