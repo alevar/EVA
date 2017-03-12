@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-# ./wrapper.py -i SRR821573.cram -r 0.1:0.9:0.1 -a /scratch0/genomes/hg38/annotation/hg38_p8.biotype_flt.cls.gff3 -e /scratch0/genomes/hg38/hg38.fa
-
+# ./wrapper.py -i ./data/ERR188044_chrX.sam -r 0.1:1.1:0.3 -a /scratch0/genomes/hg38/annotation/hg38_p8.biotype_flt.cls.gff3 -e /scratch0/genomes/hg38/hg38.fa -t 8 -o /scratch0/avaraby/replica/protocolCov/test3 -w 2 -f 2
 
 # another useful command for selecting protein coding genes from the annotation
 # awk -F "\t" '$3 == "gene" {print $9}' hg38_p8.biotype_flt.cls.gff3 | awk -F ";" '$7 == "gene_biotype=protein_coding"'
@@ -277,8 +276,9 @@ def main(argv):
         open(outDir+"/stats.log",'a').close()
         print("The default log was created in"+outDir+"/stats.log")
 
-    if args.out is not None and os.path.isdir(args.out):
+    if args.out is not None:
         outDir = args.out
+        os.system("mkdir -p "+outDir)
 
     # For MARCC need to add parallelization within this wrapper:
     # this level of paralellization will allow running the wrapper simultaneously on multiple tissue samples (read as input files).
@@ -295,26 +295,30 @@ def main(argv):
         #     if(os.path.exists(outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")):
         #         os.system("rm -r "+outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i)+".cram")
 
-        if(not os.path.exists(outDir+"/downsamp/"+baseDirName)):
-            os.makedirs(outDir+"/downsamp/"+baseDirName)
-        for i in xfrange(covRange[0],covRange[1],covRange[2]):
-            if(os.path.exists(outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i))):
-                os.system("rm -r "+outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i))
-            os.makedirs(outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i))
+#!
 
-        if(not os.path.exists(outDir+"/assembly/"+baseDirName)):
-            os.makedirs(outDir+"/assembly/"+baseDirName)
-        for i in xfrange(covRange[0],covRange[1],covRange[2]):
-            if(os.path.exists(outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(i))):
-                os.system("rm -r "+outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(i))
-            os.makedirs(outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(i))
+        # if(not os.path.exists(outDir+"/downsamp/"+baseDirName)):
+        #     os.makedirs(outDir+"/downsamp/"+baseDirName)
+        # for i in xfrange(covRange[0],covRange[1],covRange[2]):
+        #     if(os.path.exists(outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i))):
+        #         os.system("rm -r "+outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i))
+        #     os.makedirs(outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(i))
 
-        if(not os.path.exists(outDir+"/statsAl/"+baseDirName)):
-            os.makedirs(outDir+"/statsAl/"+baseDirName)
-        for i in xfrange(covRange[0],covRange[1],covRange[2]):
-            if(os.path.exists(outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))):
-                os.system("rm -r "+outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))
-            os.makedirs(outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))
+        # if(not os.path.exists(outDir+"/assembly/"+baseDirName)):
+        #     os.makedirs(outDir+"/assembly/"+baseDirName)
+        # for i in xfrange(covRange[0],covRange[1],covRange[2]):
+        #     if(os.path.exists(outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(i))):
+        #         os.system("rm -r "+outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(i))
+        #     os.makedirs(outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(i))
+
+        # if(not os.path.exists(outDir+"/statsAl/"+baseDirName)):
+        #     os.makedirs(outDir+"/statsAl/"+baseDirName)
+        # for i in xfrange(covRange[0],covRange[1],covRange[2]):
+        #     if(os.path.exists(outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))):
+        #         os.system("rm -r "+outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))
+        #     os.makedirs(outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(i))
+
+#!
 
         # Perhaps also add a step to break the alignment into functional pieces based on the reference, so that separate directories/files may be created for different genes. Analysis will be much faster and perhaps easier
 
@@ -345,34 +349,44 @@ def main(argv):
 # the final version will be slightly more elaborate
         gtf = "/scratch0/RNAseq_protocol/chrX_data/genes/chrX.gtf"
 
+        # If this method with the script works - consider writing the config file from here rather than passing parameters
+
         for scalefactor in xfrange(covRange[0],covRange[1],covRange[2]):
             for rep in range(numReps):
+                inFile = path
+                finDir = outDir+"/"+baseDirName+"/"+baseDirName
+                scriptCMD = "./rnaseq_al_pipe.sh "+inFile+" "+finDir+" "+str(scalefactor)+" "+str(rep)
 
-                finSampDir = outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
-                finAssemDir = outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
-                finStatDir = outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
+                os.system(scriptCMD)
 
-                outSampName =finSampDir+baseDirName+"_F:"+str(scalefactor)+"_R:"+str(rep)
-                outAssemName =finAssemDir+baseDirName+"_F:"+str(scalefactor)+"_R:"+str(rep)
+        # for scalefactor in xfrange(covRange[0],covRange[1],covRange[2]):
+        #     for rep in range(numReps):
 
-                downSampleCmd = "samtools view -h -s "+str(scalefactor)+" "+path+" > "+outSampName+".sam"
-                sortCommand = "samtools view -S -b "+outSampName+".sam | samtools sort -@ "+str(threads)+" -o "+outSampName+".bam -"
-                assemCommand = "stringtie -p "+str(threads)+" -G "+gtf+" -o "+outAssemName+".gtf -l "+outAssemName+" "+outSampName+".bam"
-                
-                mergeCommand0 = "ls -l "+outAssemName+".gtf > "+finStatDir+"mergelist_F:"+str(scalefactor)+"_R:"+str(rep)+".txt"
-                mergeCommand1 = "stringtie --merge -p "+str(threads)+" -G "+gtf+" -o "+finStatDir+"stringtie_merged_F:"+str(scalefactor)+"_R:"+str(rep)+".gtf "+finStatDir+"mergelist_F:"+str(scalefactor)+"_R:"+str(rep)+".txt"
-                mergeCommand2 = "stringtie -e -B -p "+str(threads)+" -G "+finStatDir+"stringtie_merged_F:"+str(scalefactor)+"_R:"+str(rep)+".gtf -o "+outAssemName+".FIN.gtf "+outSampName+".bam"
-                
-                print("BEGIN DOWNSAMPLING REP: "+str(rep))
-                os.system(downSampleCmd)
-                print("BEGIN SORTING")
-                print(sortCommand)
-                os.system(sortCommand)
-                print("BEGIN ASSEM")
-                os.system(assemCommand)
-                os.system(mergeCommand0)
-                os.system(mergeCommand1)
-                os.system(mergeCommand2)
+        #         finSampDir = outDir+"/downsamp/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
+        #         finAssemDir = outDir+"/assembly/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
+        #         finStatDir = outDir+"/statsAl/"+baseDirName+"/"+baseDirName+str(scalefactor)+"/"
+
+        #         outSampName = finSampDir+baseDirName+"_F:"+str(scalefactor)+"_R:"+str(rep)
+        #         outAssemName = finAssemDir+baseDirName+"_F:"+str(scalefactor)+"_R:"+str(rep)
+
+        #         downSampleCmd = "samtools view -h -s "+str(scalefactor)+" "+path+" > "+outSampName+".sam"
+        #         sortCommand = "samtools view -S -b "+outSampName+".sam | samtools sort -@ "+str(threads)+" -o "+outSampName+".bam -"
+        #         assemCommand = "stringtie -p "+str(threads)+" -G "+gtf+" -o "+outAssemName+".gtf -l "+outAssemName+" "+outSampName+".bam"
+
+        #         mergeCommand0 = "ls -l "+outAssemName+".gtf > "+finStatDir+"mergelist_F:"+str(scalefactor)+"_R:"+str(rep)+".txt"
+        #         mergeCommand1 = "stringtie --merge -p "+str(threads)+" -G "+gtf+" -o "+finStatDir+"stringtie_merged_F:"+str(scalefactor)+"_R:"+str(rep)+".gtf "+finStatDir+"mergelist_F:"+str(scalefactor)+"_R:"+str(rep)+".txt"
+        #         mergeCommand2 = "stringtie -e -B -p "+str(threads)+" -G "+finStatDir+"stringtie_merged_F:"+str(scalefactor)+"_R:"+str(rep)+".gtf -o "+outAssemName+".FIN.gtf "+outSampName+".bam"
+
+        #         print("BEGIN DOWNSAMPLING REP: "+str(rep))
+        #         os.system(downSampleCmd)
+        #         print("BEGIN SORTING")
+        #         print(sortCommand)
+        #         os.system(sortCommand)
+        #         print("BEGIN ASSEM")
+        #         os.system(assemCommand)
+        #         os.system(mergeCommand0)
+        #         os.system(mergeCommand1)
+        #         os.system(mergeCommand2)
 
         # for each child Fork create a temporary log in its location so that information can be saved sequentially
         # At the end of all the child processes unify all the temp logs into a single comprehensive under the parent thread
@@ -389,12 +403,13 @@ def main(argv):
 
     def parent(inputs):
         # the block below is responsible for creating the base directories
-        if(not os.path.exists(outDir+"/downsamp")):
-            os.makedirs(outDir+"/downsamp/")
-        if(not os.path.exists(outDir+"/assembly")):
-            os.makedirs(outDir+"/assembly/")
-        if(not os.path.exists(outDir+"/statsAl")):
-            os.makedirs(outDir+"/statsAl/")
+#?
+#        if(not os.path.exists(outDir+"/downsamp")):
+#            os.makedirs(outDir+"/downsamp/")
+#        if(not os.path.exists(outDir+"/assembly")):
+#            os.makedirs(outDir+"/assembly/")
+#        if(not os.path.exists(outDir+"/statsAl")):
+#            os.makedirs(outDir+"/statsAl/")
 
         theorizedForkNum = CalcNumThreads(threads) # Calculates the number of forks to make
         if args.forks is not None and args.forks <= theorizedForkNum*2: # safeguards against excessive forking
