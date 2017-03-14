@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+import multiprocessing
 
 # The following function is meant to parse the data and produce an output for plotting
 def parseDir(path,sample,params):
@@ -18,7 +19,7 @@ def parseDir(path,sample,params):
     statsOut = open(params[0],'a')
     for referenceID in np.unique(assemData["refGeneName"]):
         for point in assemData[assemData["refGeneName"] == referenceID]:
-            outLine = referenceID+"\t"+str(params[3])+"\t"+sample+"\t"+str(params[2])+"\t"+str(params[1])+"\t"+str(point['cov'])+"\t"+str(point['tpm'])+"\t"+str(params[4])+"\n"
+            outLine = referenceID+"\t"+sample+"\t"+str(params[2])+"\t"+str(params[1])+"\t"+str(point['cov'])+"\t"+str(point['tpm'])+"\n"
             statsOut.write(outLine)
     statsOut.close()
 
@@ -28,7 +29,7 @@ def findGenes(path):
     covData.sort()
     minCov = np.percentile(covData[covData >= 100],90) # find the 90 percentile of what is higher than a 100 coverage
     if not len(minCov) == 0:
-		pass
+        pass
 
 # Also need to write a method which will take the final .stat file and produce a sorted one
 def sortStat():
@@ -36,7 +37,7 @@ def sortStat():
 
 def readStat(path,regionNum,percent):
     statPath=path+"/stats.log"
-    statData = np.genfromtxt(statPath,skip_header=1, delimiter='\t',dtype={'names':['region','baseCOV','tissue','sample','sf','cov','tpm','baseTPM'],'formats':['object','i8','object','i8','f8','f8','f8','i8']})
+    statData = np.genfromtxt(statPath,skip_header=1, delimiter='\t',dtype={'names':['region','tissue','sample','sf','cov','tpm'],'formats':['object','object','i8','f8','f8','f8']})
     uniqueFACTORS = np.unique(statData["sf"])
     uniqueTISSUES = np.unique(statData["tissue"])
 
@@ -173,6 +174,8 @@ def CalcNumThreads(requestedTreads):
         except:
             pass
     cpuinfo.close()
+    cpu_count = multiprocessing.cpu_count()
+    forkNum = int(cpu_count/(requestedThreads*2))
     return forkNum # needs to be something else
 
 def xfrange(start, stop, step):
@@ -239,8 +242,8 @@ def main(argv):
     regionNum = 6
     percent = True
     if args.num is not None:
-    	regionNum = args.num
-    	percent = False
+        regionNum = args.num
+        percent = False
 
     forkNum = CalcNumThreads(threads)
 
@@ -254,11 +257,6 @@ def main(argv):
 
     def child(path):
         baseDirName = path.split("/")[-1].split(".")[:-1][0]
-
-# The snippet below is for current testing only
-# the final version will be slightly more elaborate
-        gtf = "/scratch0/RNAseq_protocol/chrX_data/genes/chrX.gtf"
-
         # If this method with the script works - consider writing the config file from here rather than passing parameters
         for scalefactor in xfrange(covRange[0],covRange[1],covRange[2]):
             for rep in range(numReps):
@@ -277,31 +275,34 @@ def main(argv):
         else:
             forkNum = theorizedForkNum
 
+        print("FORKS: ",forkNum)
+        print("THREADS: ",threads)
+
         inputAls = checkDirFile(inputs)
         childPIDS = [] # list to be populated with the fork PIDS
         # while ( we parse through the list of tissue alignments to analyze )
+        forkNum=3
         for inputFile in inputAls:
-            newpid = os.fork()
             path = inputFile
-            if newpid == 0:
-                child(os.path.abspath(path))
-                print("NEW FORK")
-            else:
-                childPIDS.append((os.getpid(),newpid))
-                if len(childPIDS) >= forkNum:
-                    expiredPID = os.wait()
-                    childPIDS.remove((os.getpid(),expiredPID[0]))
+            if len(childPIDS) >= forkNum:
+                cpJobs = childPIDS
+                for job in cpJobs:
+                    job.join()
+                    childPIDS.remove(job)
+            p = multiprocessing.Process(target=child, args=(os.path.abspath(path),))
+            childPIDS.append(p)
+            p.start()
 
         while(len(childPIDS) > 0):
-            expiredPID = os.wait()
-            childPIDS.remove((os.getpid(),expiredPID[0]))
+            jobs.join()
+            childPIDS.remove(job)
 
     parent(inputs)
 
     # here we begin parsing the assembled output .gtf
     statFilePath = outDir+"/stats.log"
     statFile=open(statFilePath,'w+')
-    statFile.write("@GENE BASE_COV TISSUE SAMPLE FACTOR COV TPM BASE_TPM\n")
+    statFile.write("@GENE TISSUE SAMPLE FACTOR COV TPM\n")
     statFile.close()
 
     inputAls = checkDirFile(inputs)
@@ -311,7 +312,7 @@ def main(argv):
         sample = path.split("/")[-1].split(".")[:-1][0]
         for sf in xfrange(covRange[0],covRange[1],covRange[2]):
             for rep in range(numReps):
-                params=[statFilePath,sf,rep,1000,1000]
+                params=[statFilePath,sf,rep]
                 endDir = outDir+"/"+sample+"/"+sample+"_F:"+str(sf)+"_R:"+str(rep)
                 parseDir(endDir,sample,params)
 

@@ -136,28 +136,32 @@ echo [`date +"%Y-%m-%d %H:%M:%S"`] "   * Assemble transcripts (StringTie)"
 $STRINGTIE -p $NUMCPUS -G ${GTFFILE} -o ${ALIGNLOC}/${nameM}.gtf \
  -l ${sample} ${ALIGNLOC}/${nameM}.bam
 
-## merge transcript file
-echo [`date +"%Y-%m-%d %H:%M:%S"`] "#> Merge all transcripts (StringTie)"
-ls -1 ${ALIGNLOC}/*.gtf > ${ALIGNLOC}/mergelist.txt
+# =====!
 
-$STRINGTIE --merge -p $NUMCPUS -G  ${GTFFILE} \
-    -o ${BALLGOWNLOC}/stringtie_merged.gtf ${ALIGNLOC}/mergelist.txt
+# ## merge transcript file
+# echo [`date +"%Y-%m-%d %H:%M:%S"`] "#> Merge all transcripts (StringTie)"
+# ls -1 ${ALIGNLOC}/*.gtf > ${ALIGNLOC}/mergelist.txt
 
-## estimate transcript abundance
-echo [`date +"%Y-%m-%d %H:%M:%S"`] "#> Estimate abundance for each sample (StringTie)"
+# $STRINGTIE --merge -p $NUMCPUS -G  ${GTFFILE} \
+#     -o ${BALLGOWNLOC}/stringtie_merged.gtf ${ALIGNLOC}/mergelist.txt
 
-isample=$(basename ${input})
-sample="${sample%%.*}"
-dsample="${sample%_*}"
-echo "+++++++++++++++++++++++++++++++++++"
-echo "DSAMPLE HERE: " $dsample
-echo "SAMPLE HERE: " $sample
-echo "+++++++++++++++++++++++++++++++++++"
-if [ ! -d ${BALLGOWNLOC}/${nameM} ]; then
-   mkdir -p ${BALLGOWNLOC}/${nameM}
-fi
-$STRINGTIE -e -B -p $NUMCPUS -G ${BALLGOWNLOC}/stringtie_merged.gtf \
--o ${BALLGOWNLOC}/${nameM}/${nameM}.gtf ${ALIGNLOC}/${nameM}.bam
+# ## estimate transcript abundance
+# echo [`date +"%Y-%m-%d %H:%M:%S"`] "#> Estimate abundance for each sample (StringTie)"
+
+# isample=$(basename ${input})
+# sample="${sample%%.*}"
+# dsample="${sample%_*}"
+# echo "+++++++++++++++++++++++++++++++++++"
+# echo "DSAMPLE HERE: " $dsample
+# echo "SAMPLE HERE: " $sample
+# echo "+++++++++++++++++++++++++++++++++++"
+# if [ ! -d ${BALLGOWNLOC}/${nameM} ]; then
+#    mkdir -p ${BALLGOWNLOC}/${nameM}
+# fi
+# $STRINGTIE -e -B -p $NUMCPUS -G ${BALLGOWNLOC}/stringtie_merged.gtf \
+# -o ${BALLGOWNLOC}/${nameM}/${nameM}.gtf ${ALIGNLOC}/${nameM}.bam
+
+# =====!
 
 awk -F '\t|;|"| ' '$3 == "transcript" && match($19,/reference_id*/) {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$11"\t"$16"\t"$21"\t"$26"\t"$31"\t"$36"\t"$41"\t"$46}' ${ALIGNLOC}/${nameM}.gtf > ${ALIGNLOC%/*}/transcripts.gtf
 
