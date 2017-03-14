@@ -104,14 +104,18 @@ else
 else
  if [[ "$ext" = "sam" ]]; then
     echo "sam"
-    $SAMTOOLS view -h -s ${sf} -S -b ${TEMPLOC}/${nameM}.sam | \
+    if [ ! -f ${output}.sam ]; then
+        cp ${input} ${output}.sam
+    fi
+
+    $SAMTOOLS view -h -s ${sf} -S -b ${output}.sam | \
      $SAMTOOLS sort -@ $NUMCPUS -o ${ALIGNLOC}/${nameM}.bam -
 
  elif [[ "$ext" = "bam" ]]; then
     echo "bam"
  elif [[ "$ext" = "cram" ]]; then
     echo "cram"
-     if [ ! -f ${output}.sam ]; then
+    if [ ! -f ${output}.sam ]; then
         $SAMTOOLS view -h -T ${reference} -o ${output}.sam ${input}
     fi
     $SAMTOOLS view -h -s ${sf} -S -b ${output}.sam | \
@@ -149,11 +153,11 @@ echo "+++++++++++++++++++++++++++++++++++"
 echo "DSAMPLE HERE: " $dsample
 echo "SAMPLE HERE: " $sample
 echo "+++++++++++++++++++++++++++++++++++"
-if [ ! -d ${BALLGOWNLOC}/${dsample} ]; then
-   mkdir -p ${BALLGOWNLOC}/${dsample}
+if [ ! -d ${BALLGOWNLOC}/${nameM} ]; then
+   mkdir -p ${BALLGOWNLOC}/${nameM}
 fi
 $STRINGTIE -e -B -p $NUMCPUS -G ${BALLGOWNLOC}/stringtie_merged.gtf \
--o ${BALLGOWNLOC}/${dsample}/${dsample}.gtf ${ALIGNLOC}/${nameM}.bam
+-o ${BALLGOWNLOC}/${nameM}/${nameM}.gtf ${ALIGNLOC}/${nameM}.bam
 
 awk -F '\t|;|"| ' '$3 == "transcript" && match($19,/reference_id*/) {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$11"\t"$16"\t"$21"\t"$26"\t"$31"\t"$36"\t"$41"\t"$46}' ${ALIGNLOC}/${nameM}.gtf > ${ALIGNLOC%/*}/transcripts.gtf
 
