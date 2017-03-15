@@ -10,7 +10,14 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 import multiprocessing
+import signal
 
+
+def signal_handler(signal, frame,forks):
+    print('You pressed Ctrl+C!')
+    for fork in forks:
+        fork.terminate()
+    sys.exit(0)
 # The following function is meant to parse the data and produce an output for plotting
 def parseDir(path,sample,params):
     assemPath=path+"/transcripts.gtf"
@@ -175,7 +182,7 @@ def CalcNumThreads(requestedTreads):
             pass
     cpuinfo.close()
     cpu_count = multiprocessing.cpu_count()
-    forkNum = int(cpu_count/(requestedThreads*2))
+    forkNum = int(cpu_count/(requestedTreads*2))
     return forkNum # needs to be something else
 
 def xfrange(start, stop, step):
@@ -202,6 +209,7 @@ def checkDirFile(inStr):
         return [inStr]
 
 def main(argv):
+    signal.signal(signal.SIGINT, signal_handler)
 
     curPath = os.path.dirname(os.path.realpath(__file__))
     outDir = curPath
@@ -275,23 +283,18 @@ def main(argv):
         else:
             forkNum = theorizedForkNum
 
-        print("FORKS: ",forkNum)
-        print("THREADS: ",threads)
-
         inputAls = checkDirFile(inputs)
         childPIDS = [] # list to be populated with the fork PIDS
         # while ( we parse through the list of tissue alignments to analyze )
-        forkNum=3
         for inputFile in inputAls:
             path = inputFile
             if len(childPIDS) >= forkNum:
-                cpJobs = childPIDS
-                for job in cpJobs:
-                    job.join()
-                    childPIDS.remove(job)
-            p = multiprocessing.Process(target=child, args=(os.path.abspath(path),))
-            childPIDS.append(p)
-            p.start()
+                    childPIDS[0].join()
+                    childPIDS.remove(childPIDS[0])
+            else:
+                p = multiprocessing.Process(target=child, args=(os.path.abspath(path),))
+                childPIDS.append(p)
+                p.start()
 
         while(len(childPIDS) > 0):
             jobs.join()
