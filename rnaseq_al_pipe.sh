@@ -165,6 +165,10 @@ $STRINGTIE -p $NUMCPUS -G ${GTFFILE} -o ${ALIGNLOC}/${nameM}.gtf \
 
 awk -F '\t|;|"| ' '$3 == "transcript" && match($19,/reference_id*/) {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$11"\t"$16"\t"$21"\t"$26"\t"$31"\t"$36"\t"$41"\t"$46}' ${ALIGNLOC}/${nameM}.gtf > ${ALIGNLOC%/*}/transcripts.gtf
 
+rm -rf ${ALIGNLOC}/ballgown
+rm -rf ${ALIGNLOC}/hisat2
+rm -rf ${ALIGNLOC}/tmp
+
 echo [`date +"%Y-%m-%d %H:%M:%S"`] "#> DONE."
 } #pipeline end
 
