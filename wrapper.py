@@ -42,93 +42,197 @@ def findGenes(path):
 def sortStat():
     pass
 
+# currently analyzes the top 5 by coverage referenced transcripts
 def readStat(path,regionNum,percent):
-    statPath=path+"/stats.log"
-    statData = np.genfromtxt(statPath,skip_header=1, delimiter='\t',dtype={'names':['region','tissue','sample','sf','cov','tpm'],'formats':['object','object','i8','f8','f8','f8']})
+    def plotIndiv(outPath,statData,binCov):
+        plt.clf()
+        plt.hold(1)
+
+        uniqueFACTORS = np.unique(statData["sf"])
+        uniqueREGIONS = np.unique(statData["region"])
+        uniqueTISSUES = np.unique(statData["tissue"])
+
+        # second method of selecting the transcripts to use
+        baseStatData = statData[statData["sf"] == 1.0]
+
+        percentile25 = np.array([])
+        percentile50 = np.array([])
+        percentile75 = np.array([])
+        percentileMin = np.array([])
+        percentileMax = np.array([])
+
+        covTPM = dict.fromkeys(uniqueFACTORS.tolist(),()) # dictionary for storing lists of normalized TPM from tissues corresponding to keys being scale factors
+        baseCovRange = [statData[(statData["sf"] == 1.0) & (statData["sample"] == 0)]["cov"].min(),statData[(statData["sf"] == 1.0) & (statData["sample"] == 0)]["cov"].max()]
+
+        # this one first groups by tissue
+        for tissue in uniqueTISSUES:
+            for region in uniqueREGIONS:
+                currentFrame = statData[(statData["region"] == region) & (statData["tissue"] == tissue)]
+                baseTPM = currentFrame[currentFrame["sf"] == 1.0]["tpm"][0]
+                for coveragePoint in uniqueFACTORS:
+                    region_covDF = currentFrame[currentFrame["sf"] == coveragePoint]
+                    newAr = (np.array(region_covDF["tpm"].tolist()).astype(float)*100.0)/float(baseTPM)
+                    if not len(newAr) == 0:
+                        # if len(covTPM[coveragePoint]) > 2:
+                            # if max(covTPM[coveragePoint]) < float(np.average(newAr)):
+                                # print("The new largest value is: "+str(coveragePoint)+" "+region+" ",float(np.average(newAr)))
+
+                        # this calculation of percent-leveled variation is very crude
+                        covTPM[coveragePoint] = covTPM[coveragePoint]+(float(np.average(newAr)),)
+
+        for factor in uniqueFACTORS:
+            # percentileMin = np.append(percentileMin,np.array(list(covTPM[factor])).min())
+            percentileMin = np.append(percentileMin,np.percentile(np.array(list(covTPM[factor])), 5))
+            percentile25 = np.append(percentile25,np.percentile(np.array(list(covTPM[factor])), 25))
+            percentile50 = np.append(percentile50,np.percentile(np.array(list(covTPM[factor])), 50))
+            percentile75 = np.append(percentile75,np.percentile(np.array(list(covTPM[factor])), 75))
+            percentileMax = np.append(percentileMax,np.percentile(np.array(list(covTPM[factor])), 95))
+            # percentileMax = np.append(percentileMin,np.array(list(covTPM[factor])).max())
+
+        plt.plot(uniqueFACTORS, percentile50,'k',color='#CC4F1B')
+        plt.fill_between(np.array(uniqueFACTORS), percentile25, percentile75,
+            alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
+        plt.fill_between(np.array(uniqueFACTORS), percentileMin, percentileMax,
+            alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
+
+        plt.suptitle("Change in TPM deviation from the mean as a function of coverage")
+        plt.title("#REG: "+str(len(uniqueREGIONS))+" BASE_COV_RANGE: "+str(baseCovRange[0])+"-"+str(baseCovRange[1]))
+        plt.xlabel("Coverage")
+        plt.ylabel("TPM percentage")
+
+        plt.savefig(outPath+"/"+str(binCov)+".png")
+
+        # Here we will attempt to calculate Coefficient of variation
+        # And use it in the plots
+
+        cvL = np.array([])
+        for factor in uniqueFACTORS:
+            std = np.std(covTPM[factor])
+            mean = np.mean(covTPM[factor])
+            cv = (std/mean)*100
+            cvL = np.append(cvL,cv)
+
+        plt.clf()
+
+        plt.plot(uniqueFACTORS, cvL,'k',color='#CC4F1B')
+        plt.scatter(uniqueFACTORS, cvL)
+        plt.title("TPM variation as a function of coverage")
+        plt.xlabel("Coverage")
+        plt.ylabel("CV")
+
+        plt.savefig(outPath+"/"+str(binCov)+"_CV.png")
+
+    if not os.path.exists(path+"/pngs"):
+        os.makedirs(path+"/pngs")
+
+    statPath = path+"/stats.log"
+    statData = np.genfromtxt(statPath,skip_header=1, delimiter='\t',dtype={'names':['region','tissue','sample','sf','cov','tpm'],'formats':['object','object','int','float','float','float']})
     uniqueFACTORS = np.unique(statData["sf"])
+    uniqueREGIONS = np.unique(statData["region"])
     uniqueTISSUES = np.unique(statData["tissue"])
 
-    u, indices = np.unique(statData["tissue"], return_inverse=True)
-    freq=u[np.argmax(np.bincount(indices))] # selecting highest frequency transcript
+    setRegions = set(uniqueREGIONS)
 
-    plt.clf()
-    plt.hold(1)
+    u, indices = np.unique(statData["region"], return_inverse=True)
+    freq=u[np.argmax(np.bincount(indices))] # selecting highest frequency transcript
 
     # begins a loop for each unique region identifier in the 0th column
     xs = []
     ys = []
 
     # this has to be done for all regions
-    uniqueTISSUES = np.unique(statData[statData["sf"] == 1.0]["tissue"])
+    uniqueREGIONS = np.unique(statData[(statData["sf"] == 1.0)]["region"])
     #verify that each selected tissue has all coverages represented by scaling factor
 
-    # Removes everything that has incomplete coverage data
-    # highly inefficient - might need to think of a better way of doing this
-    tissueBASE_TPM = {}
+    # Removes every region that has incomplete coverage or tissue data and reloads the data
+    setRegions = set(uniqueREGIONS)
     for tissue in uniqueTISSUES:
         for factor in uniqueFACTORS:
-            if len(statData[(statData["sf"] == factor) & (statData["tissue"] == tissue)]) == 0:
-                statData = statData[statData["tissue"]!=tissue]
+            setRegions.intersection_update(set(list(np.unique(statData[(statData["tissue"] == tissue) & (statData["sf"] == factor)]["region"]))))
+    # slow approach
+    # indeces = np.where((statData["region"][:,None]==np.array(list(setRegions))[:,None][:,None]).all(-1))[1]
+    # statData = statData[indeces]
 
-    # here we need to extract information only about relevantly close base coverage
-    #! the next step is to locate gaps in coverage so that more transcripts of similar coverage can be analyzed
-    # right now in the chrX the top coverage is almost 7X the second
+    # here we shall attempt to remove all the duplicate regions
+    expectedCount = len(uniqueFACTORS)*len(np.unique(statData["sample"]))*len(uniqueTISSUES) # counts the expected number of occurences in the stats file
+    unique, counts = np.unique(statData["region"], return_counts=True)
+    bins = dict(zip(unique, counts))
+    keysExpected = dict((k, v) for k, v in bins.items() if v == expectedCount).keys()
+    setRegions.intersection_update(set(keysExpected))
+    # use the output in the awk command below
+    # Certainly faster
+    cmpCMD = ""
+    newPath = path+"/statsNew.log"
+    for region in setRegions:
+        cmpCMD = cmpCMD+"""$1==\""""+region+"""\" || """
+    cmpCMD = cmpCMD[:-4]
+    awkCMD = """awk -F "\\t" '"""+cmpCMD+" {print}' "+statPath+" > "+newPath
+    os.system(awkCMD)
+
+    # Next we hsall break the information down into bins
+    # and plot several graphs based on base coverage bins
+
+    # OK. Here it goes. The grand plan:
+    #. Below we shall use the above function to create one graph
+
+    statData = np.genfromtxt(newPath,skip_header=1, delimiter='\t',dtype={'names':['region','tissue','sample','sf','cov','tpm'],'formats':['object','object','int','float','float','float']})
+    unique, counts = np.unique(statData["region"], return_counts=True)
+    bins = dict(zip(unique, counts))
+    uniqueFACTORS = np.unique(statData["sf"])
+    uniqueREGIONS = np.unique(statData["region"])
+    uniqueTISSUES = np.unique(statData["tissue"])
 
     # second method of selecting the transcripts to use
     baseStatData = statData[statData["sf"] == 1.0]
     baseStatData[::-1].sort(order=["cov"])
-    lenBase = int(len(baseStatData)*0.01)
+    lenBase = int(len(baseStatData)*0.05)
     baseStatData = baseStatData[baseStatData["sample"] == 0][0:lenBase:1]
-    bestTissuesByPercent = np.unique(baseStatData["tissue"])
+    bestTissuesByPercent = np.unique(baseStatData["region"])
 
     # now we need to identify those regions that have sufficient base coverage
     ind = np.argpartition(statData[statData["sf"] == 1.0]["cov"], -6)[-6:] # selects top 5 (multiplied by number of replicates) candidates for analysis based on the base coverage
-    bestTissuesByNum = np.unique(statData[statData["sf"] == 1.0][ind]["tissue"]) # finds out the tissue names of those
+    bestTissuesByNum = np.unique(statData[statData["sf"] == 1.0][ind]["region"]) # finds out the tissue names of those
 
-    bestTissues = []
-    print("BEST TISSUES",bestTissues)
+    bestRegions = []
 
     if percent:
-        bestTissues = bestTissuesByPercent
+        bestRegions = bestTissuesByPercent
     else:
-        bestTissues = bestTissuesByNum
+        bestRegions = bestTissuesByNum
+    statData = statData[np.logical_or.reduce([statData["region"] == x for x in bestRegions.tolist()])]
 
-    percentile25 = np.array([])
-    percentile50 = np.array([])
-    percentile75 = np.array([])
-    percentileMin = np.array([])
-    percentileMax = np.array([])
+    plotIndiv(path+"/pngs",statData,"BASE"+str(len(np.unique(statData["region"]))))
 
-    covTPM = dict.fromkeys(uniqueFACTORS.tolist(),()) # dictionary for storing lists of normalized TPM from tissues corresponding to keys being scale factors
+    # Below we shall use the above plotting function to create binned graphs
+    # reports the total number of regions; mean base coverage
+    # the excerpt bins the coverage data and groups it together into separate clusters
+    baseDF = statData[(statData["sf"] == 1.0) & (statData["sample"] == 0)]
+    intData = baseDF["cov"].astype(int)
+    bins = np.histogram(intData, bins="auto")[1] # returns the bins automatically calculated
+    binIdx = np.digitize(intData,bins)
+    
+    for i in np.unique(binIdx):
+        idx = np.where(binIdx == i)[0].tolist()
+        subDF = baseDF[idx]
+        if(len(subDF) > 2):
+            submit = statData[np.logical_or.reduce([statData["region"] == x for x in subDF["region"].tolist()])]
+            plotIndiv(path+"/pngs",submit,bins[i-1])
 
-    # this one first groups by tissue
-    for tissue in bestTissues:
-        currentFrame = statData[(statData["tissue"] == tissue)]
-        baseTPM = currentFrame[currentFrame["sf"] == 1.0]["tpm"]
-        for coveragePoint in uniqueFACTORS:
-            region_covDF = currentFrame[currentFrame["sf"] == coveragePoint]
-            newAr = (np.array(region_covDF["tpm"].tolist())*100)/float(baseTPM[0])
-            if not len(newAr) == 0:
-                covTPM[coveragePoint] = covTPM[coveragePoint]+(float(np.average(newAr)),)
+            # def piecewise_linear(x, x0, y0, k1, k2):
+            #     return np.piecewise(x, [x < x0], [lambda x:k1*x + y0-k1*x0, lambda x:k2*x + y0-k2*x0])
 
-    for factor in uniqueFACTORS:
-        percentileMin = np.append(percentileMin,np.array(list(covTPM[factor])).min())
-        percentile25 = np.append(percentile25,np.percentile(np.array(list(covTPM[factor])), 25))
-        percentile50 = np.append(percentile50,np.percentile(np.array(list(covTPM[factor])), 50))
-        percentile75 = np.append(percentile75,np.percentile(np.array(list(covTPM[factor])), 75))
-        percentileMax = np.append(percentileMax,np.array(list(covTPM[factor])).max())
+            # p , e = optimize.curve_fit(piecewise_linear, x, y)
+            # xd = np.linspace(0, 15, 100)
+            # pl.plot(x, y, "o")
+            # pl.plot(xd, piecewise_linear(xd, *p))
 
-    plt.plot(uniqueFACTORS, percentile50,'k',color='#CC4F1B')
-    plt.fill_between(np.array(uniqueFACTORS), percentile25, percentile75,
-        alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
-    plt.fill_between(np.array(uniqueFACTORS), percentileMin, percentileMax,
-        alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
+    # Below we shall use the above plotting function to create individual graphs of all the regions
+    # Reports all the referenceIDs; mean base coverage
 
-    plt.title("Change in TPM deviation from the mean as a function of coverage")
-    plt.xlabel("Coverage")
-    plt.ylabel("TPM percentage")
 
-    plt.savefig(path+"/covTPM.png")
+
+    # lastly we will use segmented regression to plot and analyze the data
+    # Reports the referenceID of the gene; base coverage; base TPM
 
 # Also need to include a logger so that i can tell what is happening while the application is running
 def logger():
