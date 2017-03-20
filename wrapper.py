@@ -377,7 +377,7 @@ def main(argv):
             randSeed = random.sample(range(1,10000),numReps) # Need to think where to place this line
             for rep in range(numReps):
                 inFile = path
-                scriptCMD = "./rnaseq_al_pipe.sh "+inFile+" "+finDir+" "+str(randSeed[rep]+scalefactor)+" "+str(rep)+" "+sequenceRef+" "+annotationRef
+                scriptCMD = "./rnaseq_al_pipe.sh "+inFile+" "+finDir+" "+str(randSeed[rep]+scalefactor)+" "+str(rep)+" "+sequenceRef+" "+annotationRef+" "+str(threads)
                 os.system(scriptCMD)
         os.remove(finDir+".sam")
         os._exit(0)
