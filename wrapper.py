@@ -371,15 +371,15 @@ def main(argv):
 
     def child(path):
         baseDirName = path.split("/")[-1].split(".")[:-1][0]
+        finDir = outDir+"/"+baseDirName+"/"+baseDirName
         # If this method with the script works - consider writing the config file from here rather than passing parameters
         for scalefactor in xfrange(covRange[0],covRange[1],covRange[2]):
             randSeed = random.sample(range(1,10000),numReps) # Need to think where to place this line
             for rep in range(numReps):
                 inFile = path
-                finDir = outDir+"/"+baseDirName+"/"+baseDirName
                 scriptCMD = "./rnaseq_al_pipe.sh "+inFile+" "+finDir+" "+str(randSeed[rep]+scalefactor)+" "+str(rep)+" "+sequenceRef+" "+annotationRef
                 os.system(scriptCMD)
-
+        os.remove(finDir+".sam")
         os._exit(0)
 
     def parent(inputs):
