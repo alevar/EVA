@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# ./wrapper.py -i ./data/cram/ -r 0.05:1.05:0.05 -a /scratch0/genomes/hg38/annotation/hg38_p8.biotype_flt.cls.gff3 -e /scratch0/genomes/hg38/hg38.fa -t 2 -o /scratch0/avaraby/replica/protocolCov/test -w 2 -f 10
+
 import os
 import argparse
 import sys
@@ -371,6 +373,7 @@ def main(argv):
         baseDirName = path.split("/")[-1].split(".")[:-1][0]
         # If this method with the script works - consider writing the config file from here rather than passing parameters
         for scalefactor in xfrange(covRange[0],covRange[1],covRange[2]):
+            randSeed = random.sample(range(1,10000),numReps) # Need to think where to place this line
             for rep in range(numReps):
                 inFile = path
                 finDir = outDir+"/"+baseDirName+"/"+baseDirName
