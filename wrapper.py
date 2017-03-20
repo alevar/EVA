@@ -377,7 +377,7 @@ def main(argv):
             for rep in range(numReps):
                 inFile = path
                 finDir = outDir+"/"+baseDirName+"/"+baseDirName
-                scriptCMD = "./rnaseq_al_pipe.sh "+inFile+" "+finDir+" "+str(scalefactor)+" "+str(rep)+" "+sequenceRef+" "+annotationRef
+                scriptCMD = "./rnaseq_al_pipe.sh "+inFile+" "+finDir+" "+str(randSeed[rep]+scalefactor)+" "+str(rep)+" "+sequenceRef+" "+annotationRef
                 os.system(scriptCMD)
 
         os._exit(0)
