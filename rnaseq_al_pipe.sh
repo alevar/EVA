@@ -10,14 +10,20 @@ echo $ext
 echo $nameM
 output=$2
 sf=$3
+if [[ ${sf#*.} -eq 0 ]]; then
+    sfName="1.${sf#*.}"
+else
+    sfName="0.${sf#*.}"
+fi
 rep=$4
 reference=$5
 GTFFILE=$6
+NUMCPUS=$7
 
 echo "+++++++++++++++++++++++++++++++"
 echo "+++++++++++++++++++++++++++++++"
 echo "${output}"
-OUTDIR="${output}_F:${sf}_R:${rep}"
+OUTDIR="${output}_F:${sfName}_R:${rep}"
 
 ## load variables
 if [[ ! -f ./rnaseq_pipeline.config.sh ]]; then
