@@ -61,6 +61,7 @@ def plotIndivNew(outPath,statData,binCov):
     percentileMax = np.array([])
 
     covTPM = dict.fromkeys(uniqueFACTORS.tolist(),()) # dictionary for storing lists of normalized TPM from tissues corresponding to keys being scale factors
+    extCoord = dict.fromkeys(uniqueFACTORS.tolist(),())
     baseCovRange = [statData[(statData["sf"] == 1.0) & (statData["sample"] == 0)]["cov"].min(),statData[(statData["sf"] == 1.0) & (statData["sample"] == 0)]["cov"].max()]
 
     # this one first groups by tissue
@@ -73,8 +74,10 @@ def plotIndivNew(outPath,statData,binCov):
             newAr = (np.array(region_covDF["tpm"].tolist()).astype(float)*100.0)/float(baseTPM)
             if not len(newAr) == 0:
                 covTPM[coveragePoint] = covTPM[coveragePoint]+(float(np.average(newAr)),)
+                extCoord[coveragePoint] = extCoord[coveragePoint]+([float(np.average(newAr)),pair],)
 
     extremes = dict.fromkeys(uniqueFACTORS.tolist(),())
+    extremesDBL = dict.fromkeys(uniqueFACTORS.tolist(),())
 
     for factor in uniqueFACTORS:
         # Identify whiskers and outliers via [(Q1-1.5IQR),(Q3+1.5IQR)]
@@ -94,11 +97,16 @@ def plotIndivNew(outPath,statData,binCov):
 
         extremes[factor] = extremes[factor]+(np.compress(np.array(list(covTPM[factor])) > actualHigh, np.array(list(covTPM[factor]))),)
         extremes[factor] = extremes[factor]+(np.compress(np.array(list(covTPM[factor])) < actualLow, np.array(list(covTPM[factor]))),)
+        z=np.array(list(extCoord[factor]))
+        extremesDBL[factor] = extremesDBL[factor]+(z[z[:,0].astype(int) > actualHigh],)
+        extremesDBL[factor] = extremesDBL[factor]+(z[z[:,0].astype(int) < actualLow],)
 
     exY = []
+    exY_DBL = []
     exX = uniqueFACTORS.tolist()
     for key in uniqueFACTORS.tolist():
         exY.append(extremes[key][0].tolist()+extremes[key][1].tolist())
+        exY_DBL.append(extremesDBL[key][0].tolist()+extremesDBL[key][1].tolist())
 
     plt.close('all')
 
@@ -158,8 +166,8 @@ def plotIndivNew(outPath,statData,binCov):
     ax3.plot(uniqueFACTORS,[0]*len(uniqueFACTORS))
 
     ax2.scatter(uniqueFACTORS, cvL)
-    print("HOLA: ", exY)
-    for ext in extremeH:
+    fullExtreme = extremeH.tolist()+extremeL.tolist()
+    for ext in fullExtreme:
         curFactor = uniqueFACTORS[dev_2.tolist().index(ext)]
         sfIDX = uniqueFACTORS.tolist().index(curFactor)
         if not curFactor == uniqueFACTORS[-1] and not curFactor == uniqueFACTORS[0]:
@@ -168,19 +176,10 @@ def plotIndivNew(outPath,statData,binCov):
             if not len(exY[sfIDX]) == 0:
                 if abs(max(exY[sfIDX])-percentile50[sfIDX]) > abs(min(exY[sfIDX])-percentile50[sfIDX]):
                     ax1.scatter([curFactor],[max(exY[sfIDX])],marker="x",c="#ff0000")
+                    ax1.annotate(xy=(curFactor,max(exY[sfIDX])),s=exY_DBL[sfIDX][1])
                 else:
                     ax1.scatter([curFactor],[min(exY[sfIDX])],marker="x",c="#ff0000")
-    for ext in extremeL:
-        curFactor = uniqueFACTORS[dev_2.tolist().index(ext)]
-        sfIDX = uniqueFACTORS.tolist().index(curFactor)
-        if not curFactor == uniqueFACTORS[-1] and not curFactor == uniqueFACTORS[0]:
-            ax2.scatter([curFactor],cvL[sfIDX],marker="x",c="#ff0000")
-            if not len(exY[sfIDX]) == 0:
-                if abs(max(exY[sfIDX])-percentile50[sfIDX]) > abs(min(exY[sfIDX])-percentile50[sfIDX]):
-                    ax1.scatter([curFactor],[max(exY[sfIDX])],marker="x",c="#ff0000")
-                else:
-                    ax1.scatter([curFactor],[min(exY[sfIDX])],marker="x",c="#ff0000")
-
+                    ax1.annotate(xy=(curFactor,min(exY[sfIDX])),s=exY_DBL[sfIDX][1])
 
     ax2.set_title('Coefficient of Variation')
     ax2.plot(uniqueFACTORS, cvL,'k',color='#CC4F1B')
