@@ -46,6 +46,40 @@ def findGenes(path):
 def sortStat():
     pass
 
+# this function will calculate the order of the most abundant transcripts
+# for each coverage point and will produce a plot accordingly
+def calcOrder(path): 
+    if not os.path.exists(path+"/pngs"):
+        os.makedirs(path+"/pngs")
+
+    statPath = path+"/statsSample.log"
+    statData = np.genfromtxt(statPath,skip_header=1, delimiter='\t',dtype={'names':['region','tissue','sample','sf','cov','tpm'],'formats':['object','object','int','float','float','float']})
+    uniqueFACTORS = np.unique(statData["sf"])
+    uniqueREGIONS = np.unique(statData["region"])
+    uniqueTISSUES = np.unique(statData["tissue"])
+    uniqueSAMPLES = np.unique(statData["sample"])
+
+    orderByTPM = dict.fromkeys(uniqueFACTORS.tolist(),())
+    for sf in uniqueFACTORS:
+        sfDF = statData[statData["sf"] == sf]
+        sfDF[::-1].sort(order=["tpm"])
+        lenBase = int(len(sfDF)*0.001)
+        # Consider averaging samples
+        # Another idea is to present shaded IQR - such approach can be difficult to read
+        sfTop_sorted = sfDF[0:lenBase:1]
+        uniquePair = np.unique(sfTop_sorted[["region","tissue"]])
+        tempOrder = []
+        for pair in uniquePair:
+            samples = sfTop_sorted[(sfTop_sorted["region"] == pair[0]) & (sfTop_sorted["tissue"] == pair[1])]
+            avgSamples = np.average(samples["tpm"])
+            orderByTPM[sf] = orderByTPM[sf]+((avgSamples,pair),)
+
+        # orderByTPM[sf] = sorted(orderByTPM[sf])
+        print(orderByTPM)
+        orderByTPM[sf] = sorted(orderByTPM[sf], key=lambda tup: tup[0])
+        # orderByTPM[sf].sort(key=lambda tup: tup[0])
+    # print(orderByTPM)
+
 def plotIndivNew(outPath,statData,binCov):
     uniqueFACTORS = np.unique(statData["sf"])
     uniqueREGIONS = np.unique(statData["region"])
@@ -637,8 +671,8 @@ def main(argv):
                 p.start()
 
         while(len(childPIDS) > 0):
-            jobs.join()
-            childPIDS.remove(job)
+            childPIDS.join([-1])
+            childPIDS.remove(childPIDS[-1])
 
     parent(inputs)
 
