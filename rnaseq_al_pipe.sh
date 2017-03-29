@@ -23,6 +23,9 @@ NUMCPUS=$7
 echo "+++++++++++++++++++++++++++++++"
 echo "+++++++++++++++++++++++++++++++"
 echo "${output}"
+if [[ $sfName == "0.0" ]]; then
+    sfName="1.0"
+fi
 OUTDIR="${output}_F:${sfName}_R:${rep}"
 
 ## load variables
