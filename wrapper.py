@@ -626,6 +626,9 @@ def checkDirFile(inStr):
     else:
         return [inStr]
 
+
+childPIDS = [] # list to be populated with the fork PIDS
+
 def main(argv):
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -703,7 +706,6 @@ def main(argv):
             forkNum = theorizedForkNum
 
         inputAls = checkDirFile(inputs)
-        childPIDS = [] # list to be populated with the fork PIDS
         # while ( we parse through the list of tissue alignments to analyze )
         for inputFile in inputAls:
             path = inputFile
@@ -741,5 +743,24 @@ def main(argv):
     # here we shall parse the stat file and produce the graph
     readStat(outDir,regionNum,percent)
 
+def exit_gracefully(signum, frame):
+    signal.signal(signal.SIGINT, original_sigint)
+
+    try:
+        while not len(childPIDS) == 0:
+            for job in childPIDS:
+                # print("job")
+                job.terminate()
+                childPIDS.remove(job)
+                print("quitting job")
+
+    except KeyboardInterrupt:
+        print("Ok ok, quitting")
+        sys.exit(1)
+   
+    signal.signal(signal.SIGINT, exit_gracefully)
+
 if __name__=="__main__":
+    original_sigint = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, exit_gracefully)
     main(sys.argv[1:])
