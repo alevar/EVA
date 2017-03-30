@@ -46,6 +46,47 @@ def findGenes(path):
 def sortStat():
     pass
 
+def calcOrderTopBase(path,n):
+    plt.close("all")
+    plt.yscale('log')
+    if not os.path.exists(path+"/pngs"):
+        os.makedirs(path+"/pngs")
+
+    statPath = path+"/statsW.log"
+    statData = np.genfromtxt(statPath,skip_header=1, delimiter='\t',dtype={'names':['region','tissue','sample','sf','cov','tpm'],'formats':['object','object','int','float','float','float']})
+    uniqueFACTORS = np.unique(statData["sf"])
+    uniqueREGIONS = np.unique(statData["region"])
+    uniqueTISSUES = np.unique(statData["tissue"])
+    uniqueSAMPLES = np.unique(statData["sample"])
+
+    # Select only top records for the base TPM/COV
+    baseDF = statData[statData["sf"] == np.max(uniqueFACTORS)]
+    baseDF[::-1].sort(order=["tpm"])
+    uniquePair = np.unique(baseDF[["region","tissue"]])
+    topPerct = float(n)/len(uniquePair)
+    lenBase = int(len(baseDF)*topPerct)
+    sfTop_sorted = baseDF[0:lenBase:1]
+
+    topBaseDict = dict.fromkeys(np.unique(sfTop_sorted[['region','tissue']]).tolist(),())
+    #now lets average out each region across samples
+    for pair in topBaseDict:
+        pointY = np.average(sfTop_sorted[(sfTop_sorted["region"] == pair[0]) & (sfTop_sorted['tissue'] == pair[1])]["tpm"])
+        topBaseDict[pair] = topBaseDict[pair]+(pointY,)
+
+    # here we shall append the sf points to the top regions by TPM/COV
+    for sf in uniqueFACTORS[::-1].tolist()[1:]:
+        for pair in topBaseDict:
+            pointY = np.average(statData[(statData["region"] == pair[0]) & (statData['tissue'] == pair[1]) & (statData["sf"] == sf)]["tpm"])
+            topBaseDict[pair] = topBaseDict[pair]+(pointY,)
+
+    color=iter(plt.cm.rainbow(np.linspace(0,1,len(topBaseDict))))
+    for key in topBaseDict:
+        c=next(color)
+        plt.plot(uniqueFACTORS[::-1],topBaseDict[key],c=c,label=key)
+
+    plt.legend(loc=2)
+    plt.savefig(path+"/pngs/order.png")
+
 # this function will calculate the order of the most abundant transcripts
 # for each coverage point and will produce a plot accordingly
 def calcOrder(path): 
@@ -59,11 +100,14 @@ def calcOrder(path):
     uniqueTISSUES = np.unique(statData["tissue"])
     uniqueSAMPLES = np.unique(statData["sample"])
 
+    n = 10
+    numPct = 10/len(np.unique(statData[["region","tissue"]]))
+
     orderByTPM = dict.fromkeys(uniqueFACTORS.tolist(),())
     for sf in uniqueFACTORS:
         sfDF = statData[statData["sf"] == sf]
         sfDF[::-1].sort(order=["tpm"])
-        lenBase = int(len(sfDF)*0.001)
+        lenBase = int(len(sfDF)*numPct)
         # Consider averaging samples
         # Another idea is to present shaded IQR - such approach can be difficult to read
         sfTop_sorted = sfDF[0:lenBase:1]
@@ -75,10 +119,10 @@ def calcOrder(path):
             orderByTPM[sf] = orderByTPM[sf]+((avgSamples,pair),)
 
         # orderByTPM[sf] = sorted(orderByTPM[sf])
-        print(orderByTPM)
+        # print(orderByTPM)
         orderByTPM[sf] = sorted(orderByTPM[sf], key=lambda tup: tup[0])
         # orderByTPM[sf].sort(key=lambda tup: tup[0])
-    # print(orderByTPM)
+    print(orderByTPM)
 
 def plotIndivNew(outPath,statData,binCov):
     uniqueFACTORS = np.unique(statData["sf"])
