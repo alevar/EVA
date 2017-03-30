@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import multiprocessing
 import signal
 import glob
+import signal
 
 def signal_handler(signal, frame,forks):
     print('You pressed Ctrl+C!')
