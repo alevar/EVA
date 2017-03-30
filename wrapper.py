@@ -15,7 +15,7 @@ import mpl_toolkits.axisartist as AA
 import matplotlib.pyplot as plt
 import multiprocessing
 import signal
-
+import glob
 
 def signal_handler(signal, frame,forks):
     print('You pressed Ctrl+C!')
@@ -89,7 +89,7 @@ def calcOrderTopBase(path,n):
 
 # this function will calculate the order of the most abundant transcripts
 # for each coverage point and will produce a plot accordingly
-def calcOrder(path): 
+def calcOrder(path):
     if not os.path.exists(path+"/pngs"):
         os.makedirs(path+"/pngs")
 
@@ -261,11 +261,11 @@ def plotIndivNew(outPath,statData,binCov):
 
     ax2.set_title('Coefficient of Variation')
     ax2.plot(uniqueFACTORS, cvL,'k',color='#CC4F1B')
-    
+
     yNP=np.array([np.array(xi) for xi in exY])
     for sf in range(len(percentile50)):
         yNP[sf]=abs(yNP[sf]-percentile50[sf])
-    ax4.set_title('Bar')    
+    ax4.set_title('Bar')
     ax4.boxplot(yNP.tolist(),labels=uniqueFACTORS.tolist())
 
     plt.xlabel("Coverage")
@@ -438,7 +438,7 @@ def identifyExtremeOutliers():
     pass
 
 # currently analyzes the top 5 by coverage referenced transcripts
-def readStat(path,regionNum,percent): 
+def readStat(path,regionNum,percent):
     if not os.path.exists(path+"/pngs"):
         os.makedirs(path+"/pngs")
 
@@ -524,7 +524,7 @@ def readStat(path,regionNum,percent):
     intData = baseDF["cov"].astype(int)
     bins = np.histogram(intData, bins="auto")[1] # returns the bins automatically calculated
     binIdx = np.digitize(intData,bins)
-    
+
     for i in np.unique(binIdx):
         idx = np.where(binIdx == i)[0].tolist()
         subDF = baseDF[idx]
@@ -612,7 +612,8 @@ def xfrange(start, stop, step):
 # This function will be used in order to verify whether the input information is submitted in bulk or as a single piece and process the information accordingly
 def checkDirFile(inStr):
     toAnalyze = []
-
+    if not isinstance(inStr,basestring):
+        return inStr
     if os.path.isdir(inStr):
         for d in os.listdir(inStr):
             if not os.path.isdir(d):
@@ -634,7 +635,7 @@ def main(argv):
     threads = 1
 
     parser = argparse.ArgumentParser(description='''Help Page''')
-    parser.add_argument('-i','--input',required=True,type=str,help="path to the CRAM allignment which is to be used in coverage efficacy analysis by downsampling")
+    parser.add_argument('-i','--input',required=True,type=str,nargs="*",help="path to the CRAM allignment which is to be used in coverage efficacy analysis by downsampling")
     parser.add_argument('-s','--stats',type=str,help="Path to the location of the informational log about the simulation")
     parser.add_argument('-r','--range',required=True,type=str,help="Specify downsampling range and step where 1.0 is full and 0.0 is none. Format: [start]:[stop]:[step]. Stop point is not included")
     parser.add_argument('-a','--annotation',required=True,type=str,help="Provide the path to the reference annotation")
