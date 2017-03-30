@@ -718,7 +718,7 @@ def main(argv):
                 p.start()
 
         while(len(childPIDS) > 0):
-            childPIDS.join([-1])
+            childPIDS[-1].join()
             childPIDS.remove(childPIDS[-1])
 
     parent(inputs)
