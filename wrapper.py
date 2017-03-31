@@ -16,13 +16,45 @@ import matplotlib.pyplot as plt
 import multiprocessing
 import signal
 import glob
-import signal
+import pandas
 
-def signal_handler(signal, frame,forks):
-    print('You pressed Ctrl+C!')
-    for fork in forks:
-        fork.terminate()
-    sys.exit(0)
+def calcOrder():
+    statPath = "./stats.log"
+    dtypeC={'region':'object','tissue':'object','sample':'int','sf':'float','cov':'float','tpm':'float','chr':'object','start':'int','end':'int'}
+    data = pd.read_csv(statPath,sep="\t",skiprows=1,names=['region','tissue','sample','sf','cov','tpm','chr','start','end'],dtype=dtypeC)
+    data = data[data["tpm"] != 0.0]
+    uniqueFACTORS = pd.unique(data["sf"])
+
+
+    # lets build base sf/tpm
+    dataCur = data[data["sf"] == 1.0].reset_index().drop("index",1)
+    dataCur['combination'] = dataCur['region']+":"+dataCur["tissue"]+":"+dataCur["chr"]
+    dataCur = dataCur.sort_values(by="tpm",ascending=False)
+    uniqueCOMBINATION = pd.unique(dataCur["combination"])
+    outDF = pd.DataFrame(uniqueCOMBINATION.reshape(uniqueCOMBINATION.shape[0],1),columns=["combination"])
+    outDF[str(1.0)] = pd.DataFrame(np.array(range(1,uniqueCOMBINATION.shape[0]+1)).reshape(uniqueCOMBINATION.shape[0],1))
+    del dataCur
+
+    print("ENTERING THE LOOP")
+    for sf in uniqueFACTORS[:-1]:
+        print("=======================================")
+        print("CURRENTLY PROCESSING: ",sf)
+        #print("LEN CURDF: ",len(dataCur)," : ",dataCur.shape)
+        print("LEN OUTDF: ",len(outDF)," : ",outDF.shape)
+        dataCur = data[data["sf"] == sf].reset_index().drop("index",1)
+        dataCur['combination'] = dataCur['region']+":"+dataCur["tissue"]+":"+dataCur["chr"]
+        dataCur = dataCur.sort_values(by="tpm",ascending=False)
+        uniqueCOMBINATION = pd.unique(dataCur["combination"])
+        del dataCur
+        dataDFN = pd.DataFrame(uniqueCOMBINATION.reshape(uniqueCOMBINATION.shape[0],1))
+        dataDFN.columns = ["combination"]
+        dataDFN["rank"] = pd.DataFrame(np.array(range(1,uniqueCOMBINATION.shape[0]+1)).reshape(uniqueCOMBINATION.shape[0],1))
+        outDF = pd.merge(outDF,dataDFN[["combination","rank"]],on='combination',how='outer')
+        del dataDFN
+        del uniqueCOMBINATION
+
+    outDF.to_csv("final.csv")
+
 # The following function is meant to parse the data and produce an output for plotting
 def parseDir(path,sample,params):
     assemPath=path+"/transcripts.gtf"
