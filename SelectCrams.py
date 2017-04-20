@@ -10,6 +10,11 @@ import sys
 import subprocess
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
+mpl.use('Agg')
+from mpl_toolkits.axes_grid1 import host_subplot
+import mpl_toolkits.axisartist as AA
+import matplotlib.pyplot as plt
 
 def isfloat(string):
     try:
@@ -35,7 +40,12 @@ def locateBestCrams(args):
             if(len(subDF) >= num):
                 submit = df[np.logical_or.reduce([df["pairsAlign"] for x in subDF["pairsAlign"].tolist()])]
                 break
-        outDF=subDF.sort_values(by="percentAlign",ascending=False).reset_index().drop("index",axis=1).iloc[0:num]
+
+        if len(outDF) > num:
+            outDF=subDF.sort_values(by="percentAlign",ascending=False).reset_index().drop("index",axis=1).iloc[0:num]
+        else:
+            outDF=subDF.sort_values(by="percentAlign",ascending=False).reset_index().drop("index",axis=1)
+        
         outDF["path"]=outDF.apply(lambda row: os.path.normpath(inputDir+row["tissue"]+"/")+"/"+row["indiv"]+".cram",axis=1)
         outDF.to_csv(output+".top")
         # here is a boxplot of the number of aligned pairs within the 12 cram files chosen for the analysis
@@ -52,7 +62,11 @@ def locateBestCrams(args):
         df["pairsAlign"]=((df["percentAlign"]/100.0)*df["nPairs"].astype(float)).astype(int)
 
         outDF=df[(df["pairsAlign"]>minBound)&(df["pairsAlign"]<maxBound)].reset_index().drop("index",axis=1)
-        outDF["path"]=outDF.apply(lambda row: os.path.normpath(inputDir+row["tissue"]+"/")+"/"+row["indiv"]+".cram",axis=1)
+        if len(outDF) > num:
+            outDF["path"]=outDF.apply(lambda row: os.path.normpath(inputDir+row["tissue"]+"/")+"/"+row["indiv"]+".cram",axis=1).iloc[0:num]
+        else:
+            outDF["path"]=outDF.apply(lambda row: os.path.normpath(inputDir+row["tissue"]+"/")+"/"+row["indiv"]+".cram",axis=1)
+
         outDF.to_csv(output+".top")
         # here is a boxplot of the number of aligned pairs within the 12 cram files chosen for the analysis
         ax=outDF["pairsAlign"].plot(kind="box",title="Distribution of the number of aligned pairs from select alignments",grid=None,xticks=None)
@@ -74,7 +88,11 @@ def locateBestCrams(args):
             if(len(subDF) >= num):
                 submit = df[np.logical_or.reduce([df["pairsAlign"] for x in subDF["pairsAlign"].tolist()])]
                 break
-        outDF=subDF.sort_values(by="percentAlign",ascending=False).reset_index().drop("index",axis=1).iloc[0:num]
+        if len(outDF) > num:
+            outDF=subDF.sort_values(by="percentAlign",ascending=False).reset_index().drop("index",axis=1).iloc[0:num]
+        else:
+            outDF=subDF.sort_values(by="percentAlign",ascending=False).reset_index().drop("index",axis=1)
+         
         outDF["path"]=outDF.apply(lambda row: os.path.normpath(inputDir+row["tissue"]+"/")+"/"+row["indiv"]+".cram",axis=1)
         outDF.to_csv(output+".top")
         # here is a boxplot of the number of aligned pairs within the 12 cram files chosen for the analysis
@@ -106,7 +124,7 @@ def locateBestCrams(args):
                 bounds = args.range.split(":")
                 alRange(alignmentLogDF,args.number,inputDir,args.out,int(bounds[0]),int(bounds[1]))
             except:
-                print("Seems the range parameter is specified incorectly")
+                print("Seems the range parameter is specified incorectly: ", sys.exc_info())
     del alignmentLogDF
 
 def main(args):
