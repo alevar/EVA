@@ -3,26 +3,23 @@
 # This test is dedicated to correctly recognizing and conditionally processing .cram/.sam/.bam input alignment info
 
 input=$1
-fname=$(basename "$input")
-ext="${fname##*.}"
-nameM="${fname%.*}"
-echo $ext
-echo $nameM
 output=$2
 sf=$3
-if [[ ${sf#*.} -eq 0 ]]; then
-    sfName="1.${sf#*.}"
-else
-    sfName="0.${sf#*.}"
-fi
 rep=$4
 reference=$5
 GTFFILE=$6
 NUMCPUS=$7
 
-echo "+++++++++++++++++++++++++++++++"
-echo "+++++++++++++++++++++++++++++++"
-echo "${output}"
+fname=$(basename "$input")
+ext="${fname##*.}"
+nameM="${fname%.*}"
+
+if [[ ${sf#*.} -eq 0 ]]; then
+    sfName="1.${sf#*.}"
+else
+    sfName="0.${sf#*.}"
+fi
+
 if [[ $sfName == "0.0" ]]; then
     sfName="1.0"
 fi
@@ -53,11 +50,6 @@ if [[ "$errprog" ]]; then
   exit 1
 fi
 
-if [[ ! -f rnaseq_ballgown.R ]]; then
-   echo "ERROR: R script rnaseq_ballgown.R not found in current directory!"
-   exit 1
-fi
-
 #determine samtools version
 newsamtools=$( ($SAMTOOLS 2>&1) | grep 'Version: 1\.')
 
@@ -71,11 +63,10 @@ fi
 
 SCRIPTARGS="$@"
 ALIGNLOC=./hisat2
-BALLGOWNLOC=./ballgown
 
 LOGFILE=./run.log
 
-for d in "$TEMPLOC" "$ALIGNLOC" "$BALLGOWNLOC" ; do
+for d in "$TEMPLOC" "$ALIGNLOC" ; do
  if [ ! -d $d ]; then
     mkdir -p $d
  fi
@@ -134,49 +125,13 @@ else
  fi
 fi
 
-#$SAMTOOLS index ${ALIGNLOC}/${sample}.bam
-#$SAMTOOLS flagstat ${ALIGNLOC}/${sample}.bam
-
-#echo "..removing intermediate files"
-# rm ${TEMPLOC}/*
-#rm ${TEMPLOC}/${sample}.unsorted.bam
-
 echo [`date +"%Y-%m-%d %H:%M:%S"`] "   * Assemble transcripts (StringTie)"
-$STRINGTIE -p $NUMCPUS -G ${GTFFILE} -o ${ALIGNLOC}/${nameM}.gtf \
+$STRINGTIE -p $NUMCPUS -G ${GTFFILE} -e -o ${ALIGNLOC}/${nameM}.gtf \
  -l ${sample} ${ALIGNLOC}/${nameM}.bam
 
-# =====!
-
-# ## merge transcript file
-# echo [`date +"%Y-%m-%d %H:%M:%S"`] "#> Merge all transcripts (StringTie)"
-# ls -1 ${ALIGNLOC}/*.gtf > ${ALIGNLOC}/mergelist.txt
-
-# $STRINGTIE --merge -p $NUMCPUS -G  ${GTFFILE} \
-#     -o ${BALLGOWNLOC}/stringtie_merged.gtf ${ALIGNLOC}/mergelist.txt
-
-# ## estimate transcript abundance
-# echo [`date +"%Y-%m-%d %H:%M:%S"`] "#> Estimate abundance for each sample (StringTie)"
-
-# isample=$(basename ${input})
-# sample="${sample%%.*}"
-# dsample="${sample%_*}"
-# echo "+++++++++++++++++++++++++++++++++++"
-# echo "DSAMPLE HERE: " $dsample
-# echo "SAMPLE HERE: " $sample
-# echo "+++++++++++++++++++++++++++++++++++"
-# if [ ! -d ${BALLGOWNLOC}/${nameM} ]; then
-#    mkdir -p ${BALLGOWNLOC}/${nameM}
-# fi
-# $STRINGTIE -e -B -p $NUMCPUS -G ${BALLGOWNLOC}/stringtie_merged.gtf \
-# -o ${BALLGOWNLOC}/${nameM}/${nameM}.gtf ${ALIGNLOC}/${nameM}.bam
-
-# =====!
-
-awk -F '\t|;|"| ' '$3 == "transcript" && match($19,/reference_id*/) {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$11"\t"$16"\t"$21"\t"$26"\t"$31"\t"$36"\t"$41"\t"$46}' ${ALIGNLOC}/${nameM}.gtf > ${ALIGNLOC%/*}/transcripts.gtf
+awk -F '\t|;|"| ' '$3 == "transcript" && match($19,/ref_gene_name*/) {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$11"\t"$16"\t"$21"\t"$26"\t"$31"\t"$36"\t"$41"\t"$46}' ${ALIGNLOC}/${nameM}.gtf > ${ALIGNLOC%/*}/transcripts.gtf
 
 rm -rf ${ALIGNLOC}
-rm -rf ${$TEMPLOC}
-rm -rf ${$BALLGOWNLOC}
 
 echo [`date +"%Y-%m-%d %H:%M:%S"`] "#> DONE."
 } #pipeline end
