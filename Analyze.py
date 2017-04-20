@@ -341,3 +341,6 @@ def main(args):
 
     dataID = readStatsID(os.path.abspath(args.input),os.path.abspath(args.out))
     plotAll(dataID,os.path.abspath(args.out),args.resolution.split(":"))
+
+    R_CMD = "Rscript ./pca.r "+os.path.abspath(args.out)
+    os.system(R_CMD)
