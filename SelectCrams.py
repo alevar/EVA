@@ -51,7 +51,7 @@ def locateBestCrams(args):
         # here is a boxplot of the number of aligned pairs within the 12 cram files chosen for the analysis
         ax=outDF["pairsAlign"].plot(kind="box",title="Distribution of the number of aligned pairs from select alignments",grid=None,xticks=None)
         plt.savefig(output+".top.png")
-        print(", ".join(outDF["path"].tolist()))
+        print(" ".join(outDF["path"].tolist()))
         del subDF
 
     def alRange(df,num,inputDir,output,minBound,maxBound):
