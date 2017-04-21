@@ -81,25 +81,25 @@ Workflow:
 
 Please make sure the following packages/libraries are installed: 
 1. Python:
- - appdirs
- - cycler
- - functools32
- - packaging
- - pyparsing
- - python-dateutil
- - pytz
- - six
- - pandas
- - matplotlib
- - seaborn
- - numpy
- - scipy
- - scikit-learn
- - subprocess
+	- appdirs
+	- cycler
+	- functools32
+	- packaging
+	- pyparsing
+	- python-dateutil
+	- pytz
+	- six
+	- pandas
+	- matplotlib
+	- seaborn
+	- numpy
+	- scipy
+	- scikit-learn
+	- subprocess
 2. R:
- - ggplot2
- - ggbiplot
+	- ggplot2
+	- ggbiplot
 3. Other:
- - stringtie
- - hisat2
- - samtools
+	- stringtie
+	- hisat2
+	- samtools
