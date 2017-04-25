@@ -59,7 +59,33 @@ def plotScattermatrixSF(data,outDir,res):
     plt.savefig(outDir+"/png/scatterMatrixSF.png")
 
 def plotAll(data,outDir,res,iqrCoefficient,gif):
+    spotsOriginal = 92884446.8 # eventuall will be suplied by the program
+    print(len(data))
+    try:
+        iqrC = float(iqrCoefficient)
+        # lets try identifying upper outliers in covBase
+        q25,q50,q75 = data['covBase'].quantile([0.25,0.5,0.75])
+        iqr = q75-q25
+        thw = q75+iqrC*iqr
+        tlw = q25-iqrC*iqr
+        ahw = data[data["covBase"]<thw]["covBase"].max()
+        alw = data[data["covBase"]>tlw]["covBase"].min()
+        data = data[(data['covBase']<ahw)&(data['covBase']>alw)]
+        data.reset_index(inplace=True)
+        data = data.drop("index",axis=1)
+    except:
+        if iqrCoefficient == "full":
+            pass
+        else:
+            try:
+                bounds = iqrCoefficient.split(":")
+                data = data[(data['covBase']<float(bounds[1]))&(data['covBase']>float(bounds[0]))]
+                data.reset_index(inplace=True)
+                data = data.drop("index",axis=1)
+            except:
+                print("Seems the coverage parameter is specified incorectly: ", sys.exc_info())
 
+    print(len(data))
     eDF = pd.DataFrame(data["ID"])
     for cl in list(data)[1:-1]:
         eDF[str(cl)] = pd.DataFrame(preprocessing.scale(boxcox(data[cl]+1)[0]))
@@ -68,7 +94,9 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
 
     fig = plt.figure()
     ims = []
-    line, = plt.plot([], [], lw=0.5)
+    line, = plt.plot([], [], lw=0.25)
+    plt.xlim(eDF["covBase"].min(), eDF["covBase"].max())
+    plt.ylim(eDF["tpmQ50"].min(), eDF["tpmQ50"].max())
     def update_line(i,sfs):
         line.set_xdata(ims[i][0])
         line.set_ydata(ims[i][1])
@@ -78,13 +106,9 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         ax.set_ylabel('Deviation of expression estimate from control (% TPM)')
         return line,
 
-    plt.xlim(eDF["covBase"].min(), eDF["covBase"].max())
-    plt.ylim(eDF["tpmQ50"].min(), eDF["tpmQ50"].max())
-
-    spotsOriginal = 92884446.8
     fig2 = plt.figure()
     ims2 = []
-    line1, = plt.plot([], [], lw=0.5)
+    line1, = plt.plot([], [], lw=0.25)
     plt.xlim(data["covBase"].min(), data["covBase"].max())
     plt.ylim(data["tpmQ50"].min(), data["tpmQ50"].max())
     def update_line2(i,sfs):
@@ -96,35 +120,33 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         ax.set_ylabel('Deviation of expression estimate from control (% TPM)')
         return line1,
 
-    unique=data["sf"].unique().tolist()[:-7]
+    unique=data["sf"].unique().tolist()
     for sf in unique:
         print(sf)
         dataTMP = data[data["sf"]==sf]
-        ax=sbn.pairplot(eDF[eDF["sf"]==sf][['covBase','tpmBase','falseNegative','tpmMEAN','tpmSTD','tpmQ25','tpmQ50','tpmQ75','tpmCV','tpmIQR']])
-        ax.savefig(outDir+"/png/"+str(sf)+"scatterMatrixByIDTransformed.png")
-        
-        try:
-            iqrC = float(iqrCoefficient)
-            # lets try identifying upper outliers in covBase
-            q25,q50,q75 = dataTMP['covBase'].quantile([0.25,0.5,0.75])
-            iqr = q75-q25
-            thw = q75+iqrCoefficient*iqr
-            ahw = dataTMP[dataTMP["covBase"]<thw]["covBase"].max()
-            dataTMP2 = dataTMP[(data['covBase']<q75)&(dataTMP['covBase']>q25)]
-        except:
-            if iqrCoefficient == "full":
-                dataTMP2 = dataTMP
-            else:
-                try:
-                    bounds = iqrCoefficient.split(":")
-                    dataTMP2 = dataTMP[(data['covBase']<float(bounds[1]))&(dataTMP['covBase']>float(bounds[0]))]
-                except:
-                    print("Seems the coverage parameter is specified incorectly: ", sys.exc_info())
+        print(len(dataTMP))
 
         plt.close("all")
-        
-        ax=sbn.pairplot(dataTMP2[['covBase','falseNegative','tpmMEAN','tpmQ50','tpmSTD','tpmIQR']])
+        ax=sbn.pairplot(dataTMP[['covBase','falseNegative','tpmMEAN','tpmQ50','tpmIQR','tpmSTD']])
         ax.savefig(outDir+"/png/"+str(sf)+"scatterMatrixByID.png")
+
+        plt.close("all")
+        ax=sbn.pairplot(eDF[eDF["sf"]==sf][['covBase','falseNegative','tpmMEAN','tpmQ50','tpmIQR','tpmSTD']])
+        ax.savefig(outDir+"/png/"+str(sf)+"scatterMatrixByIDTransformed.png")
+
+        plt.close('all')
+        plt.clf()
+        plt.figure(figsize=(int(res[0]), int(res[1])))
+        plt.title('Normalized TPM Deviation')
+        plt.plot(dataTMP["covBase"], dataTMP["tpmQ50"],'k',color='#CC4F1B',lw=0.25)
+        plt.fill_between(dataTMP["covBase"], dataTMP["tpmQ25"], dataTMP["tpmQ75"],
+            alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
+        spotsRetained = spotsOriginal*sf
+        caption = "Figure. Change in median of transcript expression levels(TPM) at "+str(sf)+" or mean of "+str(int(spotsRetained))+" spots across 12 alignments"
+        plt.figtext(.02, .02, caption,wrap=True)
+        plt.savefig(outDir+"/png/"+str(sf)+"boxID.png")
+        if gif == True:
+            ims2.append((dataTMP["covBase"],dataTMP["tpmQ50"]))
 
         plt.close('all')
         plt.clf()
@@ -132,37 +154,24 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         plt.title('Change in median, 2nd and 3rd quartiles of transcript expression levels(TPM)')
         plt.ylabel('Deviation of expression estimate from control (% TPM)')
         plt.xlabel("Portion of aligned spots")
-        plt.plot(eDF[eDF["sf"]==sf]["covBase"], eDF[eDF["sf"]==sf]["tpmQ50"],'k',color='#CC4F1B')
-        caption = "Figure. CAPTION"
+        plt.plot(eDF[eDF["sf"]==sf]["covBase"], eDF[eDF["sf"]==sf]["tpmQ50"],'k',color='#CC4F1B',lw=0.25)
+        spotsRetained = spotsOriginal*sf
+        caption = "Figure. Change in median of transcript expression levels(TPM) at "+str(sf)+" or mean of "+str(int(spotsRetained))+" spots across 12 alignments. A BoxCoxTransformation was applied to coverage and tpm values for the purpose of normalization"
         plt.figtext(.02, .02, caption,wrap=True)
         plt.savefig(outDir+"/png/"+str(sf)+"boxIDTransformed.png")
         if gif == True:
             ims.append((eDF[eDF["sf"]==sf]["covBase"],eDF[eDF["sf"]==sf]["tpmQ50"]))
-        
-        # plt.close("all")
-        # ax=eDF[eDF["sf"]==sf][['covBase','falseNegative','tpmMEAN','tpmQ50','tpmSTD','tpmIQR']].plot(x=eDF[eDF["sf"]==sf]["covBase"],subplots=True, layout=(4, 4), figsize=(int(res[0]), int(res[1])), sharex=False)
-        # plt.savefig(outDir+"/png/"+str(sf)+"groupedIDTransformed.png")
-
-        plt.close('all')
-        plt.clf()
-        plt.figure(figsize=(int(res[0]), int(res[1])))
-        plt.title('Normalized TPM Deviation')
-        plt.plot(dataTMP2["covBase"], dataTMP2["tpmQ50"],'k',color='#CC4F1B')
-        plt.fill_between(dataTMP2["covBase"], dataTMP2["tpmQ25"], dataTMP2["tpmQ75"],
-            alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
-        caption = "Figure. CAPTION"
-        plt.figtext(.02, .02, caption,wrap=True)
-        plt.savefig(outDir+"/png/"+str(sf)+"boxID.png")
-        if gif == True:
-            ims2.append((dataTMP2["covBase"],dataTMP2["tpmQ50"]))
             
         # plt.close("all")
         # ax=dataTMP2[['covBase','tpmBase','falseNegative','tpmMEAN','tpmSTD','tpmQ25','tpmQ50','tpmQ75','tpmCV','tpmIQR']].plot(x=dataTMP2["covBase"],subplots=True, layout=(4, 4), figsize=(int(res[0]), int(res[1])), sharex=False)
         # plt.savefig(outDir+"/png/"+str(sf)+"groupedID.png")
-        
-        del dataTMP
+
+        # plt.close("all")
+        # ax=eDF[eDF["sf"]==sf][['covBase','falseNegative','tpmMEAN','tpmQ50','tpmSTD','tpmIQR']].plot(x=eDF[eDF["sf"]==sf]["covBase"],subplots=True, layout=(4, 4), figsize=(int(res[0]), int(res[1])), sharex=False)
+        # plt.savefig(outDir+"/png/"+str(sf)+"groupedIDTransformed.png")
+
         del ax
-        del dataTMP2
+        del dataTMP
 
     if gif == True:
         ims.reverse()
@@ -176,6 +185,8 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
 def main(args):
     if not os.path.exists(os.path.abspath(args.out)):
         os.makedirs(os.path.abspath(args.out))
+    if not os.path.exists(os.path.abspath(args.out)+"/csv"):
+        os.makedirs(os.path.abspath(args.out)+"/csv")
     if not os.path.exists(os.path.abspath(args.out)+"/png"):
         os.makedirs(os.path.abspath(args.out)+'/png')
 
