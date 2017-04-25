@@ -1,5 +1,7 @@
 # EVA - Expression Variation Analysis
 
+[![Sample Outputs (more can be found in sample directory)](https://github.com/alevar/EVA/blob/master/sampleOut/png/boxID.gif)
+
 EVA is a tool designed to facilitate better understanding of the effects sequence deth and coverage have on the estimation of transcription levels (TPM) in a transcriptome.
 
 The end goal of running EVA is to gain sufficient understanding of what levels of variations in transcript expression estimates to expect based on the number of reads sequenced and particular research interests (such as but not limited to: interest in transcripts with low or high expressions levels). We hope this tool will aid researchers in estimating the costs for their RNA-seq experiments.
