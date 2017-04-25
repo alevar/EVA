@@ -1,6 +1,6 @@
 # EVA - Expression Variation Analysis
 
-(https://github.com/alevar/EVA/blob/master/sampleOut/png/boxID.gif)
+![](https://github.com/alevar/EVA/blob/master/sampleOut/png/boxID.gif)
 
 EVA is a tool designed to facilitate better understanding of the effects sequence deth and coverage have on the estimation of transcription levels (TPM) in a transcriptome.
 
