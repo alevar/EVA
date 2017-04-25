@@ -1,3 +1,10 @@
+list.of.packages <- c("ggplot2","devtools","vqv/ggbiplot")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+new.dev.packages <- list.of.packages[!(list.of.packages %in% ("vqv/ggbiplot"))]
+new.undev.packages <- list.of.packages[!(list.of.packages %in% c("ggplot2","devtools"))]
+if(length(new.undev.packages)) install.packages(new.undev.packages)
+if(length(new.dev.packages)) install_github("vqv/ggbiplot")
+
 library(ggbiplot)
 args <- commandArgs(trailingOnly = TRUE)
 outDir=paste(args[1],"/png/PCA.png",sep="")
