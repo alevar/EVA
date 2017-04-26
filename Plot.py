@@ -20,6 +20,8 @@ from scipy.stats import boxcox
 from pandas.tools.plotting import scatter_matrix
 from matplotlib import animation
 
+spotsOriginal = 92884446.8 # eventuall will be suplied by the program
+
 def plotBoxSF(data,outDir,res):
     # First we plotted the median, q25 and q75
     plt.close('all')
@@ -27,7 +29,7 @@ def plotBoxSF(data,outDir,res):
     plt.figure(figsize=(int(res[0]), int(res[1])))
     plt.title('Change in median, 2nd and 3rd quartiles of transcript expression levels(TPM)')
     plt.ylabel('Deviation of expression estimate from control (% TPM)')
-    plt.xlabel("Portion of aligned spots")
+    plt.xlabel("Portion of aligned spots used in assembly. Full alignment contained "+str(spotsOriginal)+" spots")
     plt.plot(data["sf"], data["median"],'k',color='#CC4F1B')
     plt.fill_between(data["sf"], data["q25"], data["q75"],
         alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
@@ -44,9 +46,10 @@ def plotTauSF(data,outDir,res):
     # Next we plotted all kendal tau coefficients
     title = "Portion of aligned spots versus Kendall's Tau ranking of transcripts by expression levels"
     ax=data[["sf","tauFull","tauTop10","tauTop20","tauTop50","tauBottom50","tauBottom20","tauBottom10"]].plot(x="sf",subplots=False, figsize=(int(res[0]), int(res[1])), title=title);
-    ax.set_xlabel("Portion of aligned spots")
+    ax.set_xlabel("Portion of aligned spots used in assembly. Full alignment contained "+str(spotsOriginal)+" spots")
     ax.set_ylabel("Kendall's Tau ranking correlation coefficient")
-    caption = "Figure. Plot shows the change in Kendall's tau ranking correlation coefficient between the ranking of transcripts by expression levels(TPM) using all reads in the alignment and the ranking of same transcripts using a portion of aligned reads. Assembly and expression estimation was performed using stringtie. Original number of aligned reads is .... Number of transcripts is ... etc"
+    numTransc = len(data["ID"].unique())/len(data["tissue"].unique())
+    caption = "Figure. Plot shows the change in Kendall's tau ranking correlation coefficient between the ranking of transcripts by expression levels(TPM) using all reads in the alignment and the ranking of same transcripts using a portion of aligned reads. Assembly and expression estimation was performed using stringtie. Original number of aligned reads is "+str(spotsOriginal)+" Number of transcripts is "+str(numTransc)+" etc"
     plt.figtext(.05, .05, caption,wrap=True,fontsize=18)
     plt.savefig(outDir+"/png/tauSF.png")
 
@@ -58,8 +61,34 @@ def plotScattermatrixSF(data,outDir,res):
     plt.figtext(.05, .05, caption,wrap=True,fontsize=18)
     plt.savefig(outDir+"/png/scatterMatrixSF.png")
 
+def plotPCA(data,outDir,res):
+    Y = data["sf"]
+    X = data[["falsePositives","falseNegatives","falseNegativesFull","median","weightedNormalizedNumExtremes","std","tauFull"]]
+    X_std = StandardScaler().fit_transform(X)
+
+    sklearn_pca = sklearnPCA(n_components=2)
+    Y_sklearn = sklearn_pca.fit_transform(X_std)*-1
+
+    with plt.style.context('seaborn-whitegrid'):
+        plt.figure(figsize=(6, 4))
+        plt.scatter(Y.tolist(),Y_sklearn[:,0].tolist())
+        plt.xlabel('Sampling Factor')
+        plt.ylabel('Principal Component')
+        plt.legend(loc='lower center')
+        plt.tight_layout()
+
+    xs=Y_sklearn[:,0]
+    ys=Y_sklearn[:,1]*-1
+    n=sklearn_pca.components_.shape[1]
+    labels = ["falsePositives","falseNegatives","falseNegativesFull","median","weightedNormalizedNumExtremes","std","tauFull"]
+    plt.figure(figsize=(30,30))
+    plt.scatter(xs,ys)
+    for i in range(n):
+        plt.arrow(0, 0, sklearn_pca.components_[0,i]*-1, sklearn_pca.components_[1,i],color='r',alpha=0.5)
+        plt.text(sklearn_pca.components_[0,i]*-1.15, sklearn_pca.components_[1,i] * 1.15, labels[i], color='g', ha='center', va='center',size=26)
+    plt.savefig(outDir+"/png/pcaSF.png")
+
 def plotAll(data,outDir,res,iqrCoefficient,gif):
-    spotsOriginal = 92884446.8 # eventuall will be suplied by the program
     print(len(data))
     try:
         iqrC = float(iqrCoefficient)
@@ -221,6 +250,7 @@ def main(args):
         plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
         plotTauSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
         plotScattermatrixSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
+        plotPCA(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
 
     if not args.id == None:
         headersID = ['ID',
@@ -238,6 +268,3 @@ def main(args):
         dataID = pd.read_csv(os.path.abspath(args.id)).drop("Unnamed: 0",axis=1)
         dataID.columns = headersID
         plotAll(dataID,os.path.abspath(args.out),args.resolution.split(":"),args.coverage,args.gif)
-
-    # R_CMD = "Rscript ./pca.r "+os.path.abspath(args.out)
-    # os.system(R_CMD)
