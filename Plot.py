@@ -19,6 +19,8 @@ from sklearn import preprocessing
 from scipy.stats import boxcox
 from pandas.tools.plotting import scatter_matrix
 from matplotlib import animation
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA as sklearnPCA
 
 spotsOriginal = 92884446.8 # eventuall will be suplied by the program
 
@@ -27,7 +29,7 @@ def plotBoxSF(data,outDir,res):
     plt.close('all')
     plt.clf()
     plt.figure(figsize=(int(res[0]), int(res[1])))
-    plt.title('Change in median, 2nd and 3rd quartiles of transcript expression levels(TPM)')
+    plt.title('Change variation of transcript expression (%TPM) estimation as a function of the portion of aligned spots')
     plt.ylabel('Deviation of expression estimate from control (% TPM)')
     plt.xlabel("Portion of aligned spots used in assembly. Full alignment contained "+str(spotsOriginal)+" spots")
     plt.plot(data["sf"], data["median"],'k',color='#CC4F1B')
@@ -36,7 +38,7 @@ def plotBoxSF(data,outDir,res):
     plt.fill_between(data["sf"], data["whiskLow"], data["whiskHigh"],
         alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
 
-    caption = "Figure. Plot shows the change in median, 2nd and 3rd quartiles for the deviation of transcript expression levels (%TPM) as a function of the number of aligned reads used in the assembly."
+    caption = "Figure. Plot shows the change in variation of estimated transcript expression levels (%TPM) as a function of the number of aligned reads used in the assembly. The plot shows the median and four quartiles of the distribution of estimated expression levels (%TPM) for each downsampling."
     plt.figtext(.05, .05, caption,wrap=True,fontsize=18)
     plt.savefig(outDir+"/png/boxSF.png")
     plt.close('all')
@@ -48,8 +50,8 @@ def plotTauSF(data,outDir,res):
     ax=data[["sf","tauFull","tauTop10","tauTop20","tauTop50","tauBottom50","tauBottom20","tauBottom10"]].plot(x="sf",subplots=False, figsize=(int(res[0]), int(res[1])), title=title);
     ax.set_xlabel("Portion of aligned spots used in assembly. Full alignment contained "+str(spotsOriginal)+" spots")
     ax.set_ylabel("Kendall's Tau ranking correlation coefficient")
-    numTransc = len(data["ID"].unique())/len(data["tissue"].unique())
-    caption = "Figure. Plot shows the change in Kendall's tau ranking correlation coefficient between the ranking of transcripts by expression levels(TPM) using all reads in the alignment and the ranking of same transcripts using a portion of aligned reads. Assembly and expression estimation was performed using stringtie. Original number of aligned reads is "+str(spotsOriginal)+" Number of transcripts is "+str(numTransc)+" etc"
+    numTransc = int(data[data["sf"]==1.0]["NumTranscripts"]/120)
+    caption = "Figure. Plot shows the change in Kendall's tau ranking correlation coefficient between the ranking of transcripts by expression levels(TPM) using all reads in the alignment and the ranking of same transcripts using a portion of aligned reads. Assembly and expression estimation was performed using stringtie. Original number of aligned reads is "+str(spotsOriginal)+". Number of transcripts is "+str(numTransc)+"."
     plt.figtext(.05, .05, caption,wrap=True,fontsize=18)
     plt.savefig(outDir+"/png/tauSF.png")
 
@@ -131,8 +133,8 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         line.set_ydata(ims[i][1])
         ax = line.get_axes()
         spotsRetained = spotsOriginal*sfs[i]
-        ax.set_xlabel("Change in median of transcript expression levels(TPM) at "+str(sfs[i])+" or mean of "+str(int(spotsRetained))+" spots across 12 alignments")
-        ax.set_ylabel('Deviation of expression estimate from control (% TPM)')
+        ax.set_xlabel("Change in median of transcript expression levels(TPM) at "+str(sfs[i]*100)+"%% of original numner of spots or mean of "+str(int(spotsRetained))+" spots across 12 alignments")
+        ax.set_ylabel('Deviation of expression estimate from control (%TPM)')
         return line,
 
     fig2 = plt.figure()
@@ -145,9 +147,24 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         line1.set_ydata(ims2[i][1])
         ax = line1.get_axes()
         spotsRetained = spotsOriginal*sfs[i]
-        ax.set_xlabel("Change in median of transcript expression levels(TPM) at "+str(sfs[i])+" or mean of "+str(int(spotsRetained))+" spots across 12 alignments")
-        ax.set_ylabel('Deviation of expression estimate from control (% TPM)')
+        ax.set_xlabel("Change in median of transcript expression levels(TPM) at "+str(sfs[i]*100)+"%% of original numner of spots or mean of "+str(int(spotsRetained))+" spots across 12 alignments")
+        ax.set_ylabel('Deviation of expression estimate from control (%TPM)')
         return line1,
+
+    fig3 = plt.figure()
+    ims3 = []
+    line2, = plt.plot([], [], lw=0.25)
+    plt.xlim(data["covBase"].min(), data["covBase"].max())
+    plt.ylim(data["falseNegative"].min(), data["falseNegative"].max())
+    def update_line3(i,sfs):
+        line2.set_xdata(ims3[i][0])
+        line2.set_ydata(ims3[i][1])
+        ax = line2.get_axes()
+        spotsRetained = spotsOriginal*sfs[i]
+        caption = "Figure. Number of false negatives reported across all random downsamplings to "+str(sf*100)+"%% spots retained for each transcript."
+        ax.set_xlabel(caption)
+        ax.set_ylabel('Number of false negatives')
+        return line2,
 
     unique=data["sf"].unique().tolist()
     for sf in unique:
@@ -171,7 +188,7 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         plt.fill_between(dataTMP["covBase"], dataTMP["tpmQ25"], dataTMP["tpmQ75"],
             alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
         spotsRetained = spotsOriginal*sf
-        caption = "Figure. Change in median of transcript expression levels(TPM) at "+str(sf)+" or mean of "+str(int(spotsRetained))+" spots across 12 alignments"
+        caption = "Figure. Change in median of transcript expression levels(TPM) at "+str(sf*100)+"%% of original numner of spots or mean of "+str(int(spotsRetained))+" spots across 12 alignments"
         plt.figtext(.02, .02, caption,wrap=True)
         plt.savefig(outDir+"/png/"+str(sf)+"boxID.png")
         if gif == True:
@@ -185,18 +202,31 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         plt.xlabel("Portion of aligned spots")
         plt.plot(eDF[eDF["sf"]==sf]["covBase"], eDF[eDF["sf"]==sf]["tpmQ50"],'k',color='#CC4F1B',lw=0.25)
         spotsRetained = spotsOriginal*sf
-        caption = "Figure. Change in median of transcript expression levels(TPM) at "+str(sf)+" or mean of "+str(int(spotsRetained))+" spots across 12 alignments. A BoxCoxTransformation was applied to coverage and tpm values for the purpose of normalization"
+        caption = "Figure. Change in median of transcript expression levels(TPM) at "+str(sf*100)+"%% of original numner of spots or mean of "+str(int(spotsRetained))+" spots across 12 alignments. A BoxCoxTransformation was applied to coverage and tpm values for the purpose of normalization"
         plt.figtext(.02, .02, caption,wrap=True)
         plt.savefig(outDir+"/png/"+str(sf)+"boxIDTransformed.png")
         if gif == True:
             ims.append((eDF[eDF["sf"]==sf]["covBase"],eDF[eDF["sf"]==sf]["tpmQ50"]))
             
-        # plt.close("all")
-        # ax=dataTMP2[['covBase','tpmBase','falseNegative','tpmMEAN','tpmSTD','tpmQ25','tpmQ50','tpmQ75','tpmCV','tpmIQR']].plot(x=dataTMP2["covBase"],subplots=True, layout=(4, 4), figsize=(int(res[0]), int(res[1])), sharex=False)
-        # plt.savefig(outDir+"/png/"+str(sf)+"groupedID.png")
+        plt.close("all")
+        plt.clf()
+        plt.figure(figsize=(int(res[0]),int(res[1])))
+        plt.title("Number of false negatives versus coverage")
+        plt.ylabel('Number of false negatives')
+        plt.xlabel("Coverage")
+        plt.plot(dataTMP["covBase"], dataTMP["falseNegative"],'k',color='#CC4F1B',lw=0.25)
+        spotsRetained = spotsOriginal*sf
+        caption = "Figure. Number of false negatives reported across all random downsamplings to "+str(sf*100)+"%% spots retained for each transcript."
+        plt.figtext(.02, .02, caption,wrap=True)
+        plt.savefig(outDir+"/png/"+str(sf)+"falseNegative.png")
+        if gif == True:
+            ims3.append((dataTMP["covBase"],dataTMP["falseNegative"]))
 
         # plt.close("all")
-        # ax=eDF[eDF["sf"]==sf][['covBase','falseNegative','tpmMEAN','tpmQ50','tpmSTD','tpmIQR']].plot(x=eDF[eDF["sf"]==sf]["covBase"],subplots=True, layout=(4, 4), figsize=(int(res[0]), int(res[1])), sharex=False)
+        # plt.clf()
+        # plt.figure(figsize=(int(res[0]),int(res[1])))
+        # plt.title("Number of false negatives reported for each "++" number of samples per downsampling")
+        # ax=eDF[eDF["sf"]==sf]['falseNegative'].plot(x=eDF[eDF["sf"]==sf]["covBase"],subplots=True, layout=(4, 4), figsize=(int(res[0]), int(res[1])), sharex=False)
         # plt.savefig(outDir+"/png/"+str(sf)+"groupedIDTransformed.png")
 
         del ax
@@ -210,6 +240,10 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         ims2.reverse()
         im_ani2 = animation.FuncAnimation(fig2, update_line2, len(unique),fargs=(list(reversed(unique)),), interval=600, blit=True)
         im_ani2.save(outDir+'/png/boxID.gif',writer="imagemagick",dpi=200)
+
+        ims3.reverse()
+        im_ani3 = animation.FuncAnimation(fig3, update_line3, len(unique),fargs=(list(reversed(unique)),), interval=600, blit=True)
+        im_ani3.save(outDir+'/png/falseNegatives.gif',writer="imagemagick",dpi=200)
 
 def main(args):
     if not os.path.exists(os.path.abspath(args.out)):
