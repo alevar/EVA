@@ -43,7 +43,7 @@ def eva(argv):
     parser_analyze.set_defaults(func=Analyze.main)
 
     parser_analyze = subparsers.add_parser('plot', help='plot help')
-    parser_analyze.add_argument('-r','--resolution',required=False,type=str,default="20:20",help="resolution of the plots provided as: width:height")
+    parser_analyze.add_argument('-r','--resolution',required=False,type=str,default="15:15",help="resolution of the plots provided as: width:height")
     parser_analyze.add_argument('-o','--out',required=False,type=str,default="./analysis",help="output directory")
     parser_analyze.add_argument('-c','--coverage',required=False,type=str,default="full",help="what range of coverage to plot")
     parser_analyze.add_argument('-f','--sf',type=str,help="plot data grouped by sampling factor")
