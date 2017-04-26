@@ -112,18 +112,22 @@ def readStatsSF(path,outDir):
     data["lost"] = data.apply(lambda row: row["tpm"] == 0.0,axis=1)
 
     # 7 Computes the number of novel mistakes at each coverage point
-    setNo = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]==0.0)]["ID"].unique()) # Lets try counting the number of novel mistake
-    setYes = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]!=0.0)]["ID"].unique()) # Lets try counting the number of novel mistake
-    setFin = list(setNo.difference(setYes)) # Lets try counting the number of novel mistake
-    dataT = dataN[dataN['ID'].isin(setFin)]
+    setTrueNeg = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]==0.0)]["ID"].unique()) # Lets try counting the number of false Positives
+    setTruePos = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]!=0.0)]["ID"].unique()) # Lets try counting the number of false Positives
+    setFalsePos = list(setTrueNeg.difference(setTruePos)) # Lets try counting the number of falsePositives
+    dataT = dataN[dataN['ID'].isin(setFalsePos)]
     del dataN
     dataSF = pd.DataFrame(dataT.groupby(['sf']).mean()).reset_index()
     print("> Begin counting false positives")
-    dataSF["falsePositives"] = dataSF.apply(lambda row: len(dataT[(dataT['ID'].isin(setFin))&(dataT["tpm"]!=0.0)&(dataT["sf"]==row["sf"])]),axis=1)
+    dataSF["falsePositives"] = dataSF.apply(lambda row: len(dataT[(dataT['ID'].isin(setFalsePos))&(dataT["tpm"]!=0.0)&(dataT["sf"]==row["sf"])]),axis=1)
+    setTruePos2 = set(data[(data["sf"]==1.0)]["ID"].unique()) # Lets try counting the number of true Positives
+    dataSF["truePositives"] = dataSF.apply(lambda row: len(data[(data['ID'].isin(setTruePos2))&(data["tpm"]!=0.0)&(data["sf"]==row["sf"])]),axis=1)
+    dataSF["recall"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falsePositives"])
     print("< Done counting false positives")
     # 2 Here we shall also count the number of losses
     print("> Begin counting false negatives")
     dataSF["falseNegatives"] = dataSF.apply(lambda row: len(data[(data["sf"] == row["sf"])&(data["lost"])]),axis=1)
+    dataSF["precision"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falseNegatives"])
     print("< Done counting false negatives")
     # 2 here we shall add information about total losses
     dataLostAll = pd.DataFrame(data.groupby(["ID","sf"]).mean()).reset_index()
@@ -204,7 +208,9 @@ def readStatsSF(path,outDir):
             "tauTop50",
             "tauBottom10",
             "tauBottom20",
-            "tauBottom50"]].to_csv(outDir+"/csv/groupedBySF.csv")
+            "tauBottom50",
+            "recall",
+            "precision"]].to_csv(outDir+"/csv/groupedBySF.csv")
     
     del dataSF
     # del data
