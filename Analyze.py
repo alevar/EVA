@@ -76,32 +76,11 @@ def KendalTau(df,dfBASE,topF=1.0,orderTop=True):
     del uniqueCOMBINATION
     return tau["rank"]["1.0"]
 
-def readStatsSF(path,outDir):
+def readStatsSFRange(data,outDir):
     print("> Begin grouping transcripts by downsampling factor")
-    dtypeC={'refID':'object',
-            'tissue':'object',
-            'sample':'int',
-            'sf':'float',
-            'cov':'float',
-            'tpm':'float',
-            'chr':'object',
-            'start':'int',
-            'end':'int',
-            'tID':'object'}
-    data = pd.read_csv(path,sep="\t",skiprows=1,names=['tissue',
-                                                        'chr',
-                                                        'refID',
-                                                        'tID',
-                                                        'start',
-                                                        'end',
-                                                        'sample',
-                                                        'sf',
-                                                        'cov',
-                                                        'tpm'],dtype=dtypeC)
 
     # Aggregate a column for uniqueID
     # ID column will be used for quantification of results and building the results DF
-    data["ID"] = data["tissue"]+":"+data["chr"]+":"+data['refID']+":"+data["tID"]+":"+data["start"].astype(str)+"-"+data["end"].astype(str)
 
     # First reject all transcripts for which tpm==0.0 at sf==1.0
     dataOff = pd.unique(data[(data["sf"] == 1.0) & (data["tpm"] == 0.0)]["ID"])
@@ -115,28 +94,28 @@ def readStatsSF(path,outDir):
     setTrueNeg = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]==0.0)]["ID"].unique()) # Lets try counting the number of false Positives
     setTruePos = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]!=0.0)]["ID"].unique()) # Lets try counting the number of false Positives
     setFalsePos = list(setTrueNeg.difference(setTruePos)) # Lets try counting the number of falsePositives
-    dataT = dataN[dataN['ID'].isin(setFalsePos)]
-    del dataN
-    dataSF = pd.DataFrame(dataT.groupby(['sf']).mean()).reset_index()
-    print("> Begin counting false positives")
-    dataSF["falsePositives"] = dataSF.apply(lambda row: len(dataT[(dataT['ID'].isin(setFalsePos))&(dataT["tpm"]!=0.0)&(dataT["sf"]==row["sf"])]),axis=1)
-    setTruePos2 = set(data[(data["sf"]==1.0)]["ID"].unique()) # Lets try counting the number of true Positives
-    dataSF["truePositives"] = dataSF.apply(lambda row: len(data[(data['ID'].isin(setTruePos2))&(data["tpm"]!=0.0)&(data["sf"]==row["sf"])]),axis=1)
-    dataSF["recall"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falsePositives"])
-    print("< Done counting false positives")
+    # dataT = dataN[dataN['ID'].isin(setFalsePos)]
+    # del dataN
+    dataSF = pd.DataFrame(data.groupby(['sf']).mean()).reset_index()
+    print(" >> Begin counting false positives")
+    dataSF["falsePositives"] = np.nan
+    # setTruePos2 = set(data[(data["sf"]==1.0)]["ID"].unique()) # Lets try counting the number of true Positives
+    # dataSF["truePositives"] = dataSF.apply(lambda row: len(data[(data['ID'].isin(setTruePos2))&(data["tpm"]!=0.0)&(data["sf"]==row["sf"])]),axis=1)
+    dataSF["recall"] = np.nan
+    print(" << Done counting false positives")
     # 2 Here we shall also count the number of losses
-    print("> Begin counting false negatives")
+    print(" >> Begin counting false negatives")
     dataSF["falseNegatives"] = dataSF.apply(lambda row: len(data[(data["sf"] == row["sf"])&(data["lost"])]),axis=1)
-    dataSF["precision"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falseNegatives"])
-    print("< Done counting false negatives")
+    print(" << Done counting false negatives")
     # 2 here we shall add information about total losses
     dataLostAll = pd.DataFrame(data.groupby(["ID","sf"]).mean()).reset_index()
     dataSF["falseNegativesFull"] = dataSF.apply(lambda row: len(dataLostAll[(dataLostAll["sf"] == row["sf"])&(dataLostAll["lost"] == 1.0)]),axis=1)
     # 3 Calculating the total number of transcripts at a particular coverage point
     dataSF["NumTranscripts"] = pd.DataFrame(data.groupby(["sf"],as_index=False)["tpm"].count())["tpm"]
+    dataSF["precision"] = (dataSF["NumTranscripts"]-dataSF["falseNegatives"])/dataSF["NumTranscripts"]
     # First we need to express tpm as percentage deviation from the baseTPM
     dictBase = pd.Series(data[data["sf"]==1.0].tpm.values,index=data[data["sf"]==1.0].ID).to_dict()
-    print("> Begin calculating percent away from the original tpm estimation")
+    print(" >> Begin calculating percent away from the original tpm estimation")
     # dataBASE = pd.DataFrame([])
     # dataBASE[["ID","baseTPM"]] = data[data["sf"]==1.0][["ID","tpm"]]
     # data = pd.merge(data, dataBASE,on='ID',how='outer')
@@ -147,8 +126,8 @@ def readStatsSF(path,outDir):
     # data["percentAway"] = (data["tpm"]/data["baseTPM"])*100
     # data.to_csv(outDir+"/csv/raw.csv")
     data["percentAway"] = data.apply(lambda row: (row["tpm"]/dictBase[row["ID"]])*100 if row["ID"] in dictBase else np.nan,axis=1)
-    print("< Done calculating percent away from the original tpm estimation")
-    print("> Begin calculating quartiles, mean and whiskers")
+    print(" << Done calculating percent away from the original tpm estimation")
+    print(" >> Begin calculating quartiles, mean and whiskers")
     dataSF["q25"] = pd.DataFrame(data.groupby(["sf"])["percentAway"].quantile(0.25)).reset_index()["percentAway"]
     dataSF["median"] = pd.DataFrame(data.groupby(["sf"])["percentAway"].quantile(0.50)).reset_index()["percentAway"]
     dataSF["q75"] = pd.DataFrame(data.groupby(["sf"])["percentAway"].quantile(0.75)).reset_index()["percentAway"]
@@ -156,9 +135,9 @@ def readStatsSF(path,outDir):
     dataSF["mean"] = pd.DataFrame(data.groupby(["sf"])["percentAway"].mean()).reset_index()["percentAway"]
 
     dataSF[['whiskLow','whiskHigh','extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk(row,data),axis=1)])
-    print("< Done calculating quartiles, mean and whiskers")
+    print(" << Done calculating quartiles, mean and whiskers")
     # now it's time to count the number of outliers for each sf
-    print("> Begin counting, weighing and normalizing counts for outliers")
+    print(" >> Begin counting, weighing and normalizing counts for outliers")
     dataSF["numExtremes"] = dataSF.apply(lambda row: len(row["extremes"]),axis=1)
     # now we shall weigh the number of extremes by the mean distance from the median point at each sf
     # the reason mean is chosen (and not the median) is because we want to assign weight based on how
@@ -166,15 +145,15 @@ def readStatsSF(path,outDir):
     dataSF["weightedNumExtremes"] = dataSF.apply(lambda row: 0 if row["sf"] == 1.0 else abs(np.array(row["extremes"])-row["median"]).mean()*row["numExtremes"],axis=1)
     # weighted extremes normalized by number of transcripts in the bin
     dataSF["weightedNormalizedNumExtremes"] = dataSF.apply(lambda row: row["weightedNumExtremes"]/row["NumTranscripts"],axis=1)
-    print("< Done counting, weighing and normalizing counts for outliers")
+    print(" << Done counting, weighing and normalizing counts for outliers")
     # add standard deviation and coefficient of variation
-    print("> Begin calculating std and cv")
+    print(" >> Begin calculating std and cv")
     dataSF["std"] = pd.DataFrame(data.groupby(["sf"])["percentAway"].std()).reset_index()["percentAway"]
     dataSF["cv"] = dataSF.apply(lambda row: (row["std"]/row['mean'])*100,axis=1)
-    print("< Done calculating std and cv")
+    print(" << Done calculating std and cv")
     # STRATEGY 3: Time to include kendal tau ranking correlation results for each sf-base pair
     # create an ID for distinguishing between samples
-    print("> Begin Ranking and Tau coeeficient calculation")
+    print(" >> Begin Ranking and Tau coeeficient calculation")
     data["RankSampleID"] = data["ID"]+":"+data["sample"].astype(str)
 
     dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
@@ -184,7 +163,7 @@ def readStatsSF(path,outDir):
     dataSF["tauBottom10"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.1,False),axis=1)
     dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
     dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
-    print("< Done Ranking and Tau coeeficient calculation")
+    print(" << Done Ranking and Tau coeeficient calculation")
     dataSF[["sf",
             "cov",
             "tpm",
@@ -216,37 +195,135 @@ def readStatsSF(path,outDir):
     # del data
     print("< Done grouping transcripts by downsampling factor")
 
-def readStatsID(path,outDir):
-    print("> Begin grouping transcripts by unique ID")
-    dtypeC={'refID':'object',
-            'tissue':'object',
-            'sample':'int',
-            'sf':'float',
-            'cov':'float',
-            'tpm':'float',
-            'chr':'object',
-            'start':'int',
-            'end':'int',
-            'tID':'object'}
-    names =['tissue',
-            'chr',
-            'refID',
-            'tID',  
-            'start',
-            'end',
-            'sample',
-            'sf',
-            'cov',
-            'tpm']
+def readStatsSFFull(data,outDir):
+    print("> Begin grouping transcripts by downsampling factor")
 
-    dataPrime = pd.read_csv(path,sep="\t",skiprows=1,names=names,dtype=dtypeC)
-    dataPrime["ID"] = dataPrime["tissue"]+":"+dataPrime["chr"]+":"+dataPrime['refID']+":"+dataPrime["tID"]+":"+dataPrime["start"].astype(str)+"-"+dataPrime["end"].astype(str)
+    # Aggregate a column for uniqueID
+    # ID column will be used for quantification of results and building the results DF
+    # data["ID"] = data["tissue"]+":"+data["chr"]+":"+data['refID']+":"+data["tID"]+":"+data["start"].astype(str)+"-"+data["end"].astype(str)
+
+    # First reject all transcripts for which tpm==0.0 at sf==1.0
+    dataOff = pd.unique(data[(data["sf"] == 1.0) & (data["tpm"] == 0.0)]["ID"])
+    uniqueID1Maintain = pd.unique(data[~data["ID"].isin(dataOff)]["ID"])
+    del dataOff
+    dataN = data[~data["ID"].isin(uniqueID1Maintain)]
+    data = data[data["ID"].isin(uniqueID1Maintain)]
+    data["lost"] = data.apply(lambda row: row["tpm"] == 0.0,axis=1)
+
+    # 7 Computes the number of novel mistakes at each coverage point
+    setTrueNeg = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]==0.0)]["ID"].unique()) # Lets try counting the number of false Positives
+    setTruePos = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]!=0.0)]["ID"].unique()) # Lets try counting the number of false Positives
+    setFalsePos = list(setTrueNeg.difference(setTruePos)) # Lets try counting the number of falsePositives
+    dataT = dataN[dataN['ID'].isin(setFalsePos)]
+    del dataN
+    dataSF = pd.DataFrame(dataT.groupby(['sf']).mean()).reset_index()
+    print(" >> Begin counting false positives")
+    dataSF["falsePositives"] = dataSF.apply(lambda row: len(dataT[(dataT['ID'].isin(setFalsePos))&(dataT["tpm"]!=0.0)&(dataT["sf"]==row["sf"])]),axis=1)
+    setTruePos2 = set(data[(data["sf"]==1.0)]["ID"].unique()) # Lets try counting the number of true Positives
+    dataSF["truePositives"] = dataSF.apply(lambda row: len(data[(data['ID'].isin(setTruePos2))&(data["tpm"]!=0.0)&(data["sf"]==row["sf"])]),axis=1)
+    dataSF["recall"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falsePositives"])
+    print(" << Done counting false positives")
+    # 2 Here we shall also count the number of losses
+    print(" >> Begin counting false negatives")
+    dataSF["falseNegatives"] = dataSF.apply(lambda row: len(data[(data["sf"] == row["sf"])&(data["lost"])]),axis=1)
+    dataSF["precision"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falseNegatives"])
+    print(" << Done counting false negatives")
+    # 2 here we shall add information about total losses
+    dataLostAll = pd.DataFrame(data.groupby(["ID","sf"]).mean()).reset_index()
+    dataSF["falseNegativesFull"] = dataSF.apply(lambda row: len(dataLostAll[(dataLostAll["sf"] == row["sf"])&(dataLostAll["lost"] == 1.0)]),axis=1)
+    # 3 Calculating the total number of transcripts at a particular coverage point
+    dataSF["NumTranscripts"] = pd.DataFrame(data.groupby(["sf"],as_index=False)["tpm"].count())["tpm"]
+    # First we need to express tpm as percentage deviation from the baseTPM
+    dictBase = pd.Series(data[data["sf"]==1.0].tpm.values,index=data[data["sf"]==1.0].ID).to_dict()
+    print(" >> Begin calculating percent away from the original tpm estimation")
+    # dataBASE = pd.DataFrame([])
+    # dataBASE[["ID","baseTPM"]] = data[data["sf"]==1.0][["ID","tpm"]]
+    # data = pd.merge(data, dataBASE,on='ID',how='outer')
+    # data = data.drop_duplicates()
+    # del dataBASE
+    # data = data.drop("tpm_y",axis=1)
+    # data.columns = ["tissue","chr","refID","tID","start","end","sample","sf","cov","tpm","ID","lost","baseTPM","percentAway"]
+    # data["percentAway"] = (data["tpm"]/data["baseTPM"])*100
+    # data.to_csv(outDir+"/csv/raw.csv")
+    data["percentAway"] = data.apply(lambda row: (row["tpm"]/dictBase[row["ID"]])*100 if row["ID"] in dictBase else np.nan,axis=1)
+    print(" << Done calculating percent away from the original tpm estimation")
+    print(" >> Begin calculating quartiles, mean and whiskers")
+    dataSF["q25"] = pd.DataFrame(data.groupby(["sf"])["percentAway"].quantile(0.25)).reset_index()["percentAway"]
+    dataSF["median"] = pd.DataFrame(data.groupby(["sf"])["percentAway"].quantile(0.50)).reset_index()["percentAway"]
+    dataSF["q75"] = pd.DataFrame(data.groupby(["sf"])["percentAway"].quantile(0.75)).reset_index()["percentAway"]
+    # get average tpm
+    dataSF["mean"] = pd.DataFrame(data.groupby(["sf"])["percentAway"].mean()).reset_index()["percentAway"]
+
+    dataSF[['whiskLow','whiskHigh','extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk(row,data),axis=1)])
+    print(" << Done calculating quartiles, mean and whiskers")
+    # now it's time to count the number of outliers for each sf
+    print(" >> Begin counting, weighing and normalizing counts for outliers")
+    dataSF["numExtremes"] = dataSF.apply(lambda row: len(row["extremes"]),axis=1)
+    # now we shall weigh the number of extremes by the mean distance from the median point at each sf
+    # the reason mean is chosen (and not the median) is because we want to assign weight based on how
+    # badly the distribution is kewed and thus mean is a better option since it is biased heavily by the outliers
+    dataSF["weightedNumExtremes"] = dataSF.apply(lambda row: 0 if row["sf"] == 1.0 else abs(np.array(row["extremes"])-row["median"]).mean()*row["numExtremes"],axis=1)
+    # weighted extremes normalized by number of transcripts in the bin
+    dataSF["weightedNormalizedNumExtremes"] = dataSF.apply(lambda row: row["weightedNumExtremes"]/row["NumTranscripts"],axis=1)
+    print(" << Done counting, weighing and normalizing counts for outliers")
+    # add standard deviation and coefficient of variation
+    print(" >> Begin calculating std and cv")
+    dataSF["std"] = pd.DataFrame(data.groupby(["sf"])["percentAway"].std()).reset_index()["percentAway"]
+    dataSF["cv"] = dataSF.apply(lambda row: (row["std"]/row['mean'])*100,axis=1)
+    print(" << Done calculating std and cv")
+    # STRATEGY 3: Time to include kendal tau ranking correlation results for each sf-base pair
+    # create an ID for distinguishing between samples
+    print(" >> Begin Ranking and Tau coeeficient calculation")
+    data["RankSampleID"] = data["ID"]+":"+data["sample"].astype(str)
+
+    dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
+    dataSF["tauTop10"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.1,True),axis=1)
+    dataSF["tauTop20"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.2,True),axis=1)
+    dataSF["tauTop50"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.5,True),axis=1)
+    dataSF["tauBottom10"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.1,False),axis=1)
+    dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
+    dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
+    print(" << Done Ranking and Tau coeeficient calculation")
+    dataSF[["sf",
+            "cov",
+            "tpm",
+            "falsePositives",
+            "falseNegatives",
+            "falseNegativesFull",
+            "NumTranscripts",
+            "q25",
+            "median",
+            "q75",
+            "mean",
+            "whiskLow",
+            "whiskHigh",
+            "weightedNumExtremes",
+            "weightedNormalizedNumExtremes",
+            "std",
+            "cv",
+            "tauFull",
+            "tauTop10",
+            "tauTop20",
+            "tauTop50",
+            "tauBottom10",
+            "tauBottom20",
+            "tauBottom50",
+            "recall",
+            "precision"]].to_csv(outDir+"/csv/groupedBySF.csv")
+    
+    del dataSF
+    # del data
+    print("< Done grouping transcripts by downsampling factor")
+
+def readStatsID(dataPrime,outDir):
+    print("> Begin grouping transcripts by unique ID")
+    # dataPrime["ID"] = dataPrime["tissue"]+":"+dataPrime["chr"]+":"+dataPrime['refID']+":"+dataPrime["tID"]+":"+dataPrime["start"].astype(str)+"-"+dataPrime["end"].astype(str)
     # Aggregate a column for uniqueID
     # ID column will be used for quantification of results and building the results DF
     unique=dataPrime["sf"].unique().tolist()
     frames = []
     for sf in unique[:-1]:
-        print(sf)
+        print("Grouping for: ",sf)
         df = pd.DataFrame([])
         dfTPM = pd.DataFrame([])
         df[["ID","covBase","tpmBase","sample"]] = dataPrime[(dataPrime["sf"]==1.0)&~(dataPrime["cov"]==0.0)].reset_index().drop("index",1)[["ID","cov","tpm",'sample']]
@@ -295,5 +372,61 @@ def main(args):
         os.makedirs(os.path.abspath(args.out))
         os.makedirs(os.path.abspath(args.out)+'/csv')
 
-    readStatsSF(os.path.abspath(args.input),os.path.abspath(args.out))
-    readStatsID(os.path.abspath(args.input),os.path.abspath(args.out))
+    dtypeC={'refID':'object',
+            'tissue':'object',
+            'sample':'int',
+            'sf':'float',
+            'cov':'float',
+            'tpm':'float',
+            'chr':'object',
+            'start':'int',
+            'end':'int',
+            'tID':'object'}
+    names =['tissue',
+            'chr',
+            'refID',
+            'tID',  
+            'start',
+            'end',
+            'sample',
+            'sf',
+            'cov',
+            'tpm']
+
+    data = pd.read_csv(os.path.abspath(args.input),sep="\t",skiprows=1,names=names,dtype=dtypeC)
+    data["ID"] = data["tissue"]+":"+data["chr"]+":"+data['refID']+":"+data["tID"]+":"+data["start"].astype(str)+"-"+data["end"].astype(str)
+    full = True
+    try:
+        iqrC = float(args.coverage)
+        # lets try identifying upper outliers in covBase
+        q25,q50,q75 = data['cov'].quantile([0.25,0.5,0.75])
+        iqr = q75-q25
+        thw = q75+iqrC*iqr
+        tlw = q25-iqrC*iqr
+        ahw = data[data["cov"]<thw]["cov"].max()
+        alw = data[data["cov"]>tlw]["cov"].min()
+        transcs = data[(data['cov']<ahw)&(data['cov']>alw)&(data["sf"]==1.0)]["ID"].unique()
+        data = data[data["ID"].isin(transcs)]
+        data.reset_index(inplace=True)
+        data = data.drop("index",axis=1)
+        full = False
+    except:
+        if args.coverage == "full":
+            full = True
+        else:
+            try:
+                bounds = args.coverage.split(":")
+                transcripts = data[(data['cov']<float(bounds[1]))&(data['cov']>float(bounds[0]))&(data["sf"]==1.0)]["ID"].unique()
+                data = data[data["ID"].isin(transcripts)]
+                data.reset_index(inplace=True)
+                data = data.drop("index",axis=1)
+                full = False
+            except:
+                print("Seems the coverage parameter is specified incorectly: ", sys.exc_info())
+
+    if full:
+        readStatsSFFull(data,os.path.abspath(args.out))
+    else:
+        readStatsSFRange(data,os.path.abspath(args.out))
+
+    readStatsID(data,os.path.abspath(args.out))
