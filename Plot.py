@@ -21,6 +21,7 @@ from pandas.tools.plotting import scatter_matrix
 from matplotlib import animation
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA as sklearnPCA
+mpl.rcParams['agg.path.chunksize'] = 10000
 
 spotsOriginal = 92884447 # Mean number of spots in the selected alignments. eventually will be suplied by the program
 
