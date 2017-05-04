@@ -19,6 +19,7 @@ from sklearn import preprocessing
 from scipy.stats import boxcox
 from pandas.tools.plotting import scatter_matrix
 from matplotlib import animation
+from scipy.stats import t
 
 # lets also calculate pearson r correlation coefficient
 def pearson(dataT):
@@ -190,7 +191,7 @@ def readStatsSFRange(data,outDir):
             "tauBottom50",
             "recall",
             "precision"]].to_csv(outDir+"/csv/groupedBySF.csv")
-    
+
     del dataSF
     # del data
     print("< Done grouping transcripts by downsampling factor")
@@ -221,12 +222,12 @@ def readStatsSFFull(data,outDir):
     dataSF["falsePositives"] = dataSF.apply(lambda row: len(dataT[(dataT['ID'].isin(setFalsePos))&(dataT["tpm"]!=0.0)&(dataT["sf"]==row["sf"])]),axis=1)
     setTruePos2 = set(data[(data["sf"]==1.0)]["ID"].unique()) # Lets try counting the number of true Positives
     dataSF["truePositives"] = dataSF.apply(lambda row: len(data[(data['ID'].isin(setTruePos2))&(data["tpm"]!=0.0)&(data["sf"]==row["sf"])]),axis=1)
-    dataSF["recall"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falsePositives"])
+    dataSF["precision"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falsePositives"])
     print(" << Done counting false positives")
     # 2 Here we shall also count the number of losses
     print(" >> Begin counting false negatives")
     dataSF["falseNegatives"] = dataSF.apply(lambda row: len(data[(data["sf"] == row["sf"])&(data["lost"])]),axis=1)
-    dataSF["precision"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falseNegatives"])
+    dataSF["recall"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falseNegatives"])
     print(" << Done counting false negatives")
     # 2 here we shall add information about total losses
     dataLostAll = pd.DataFrame(data.groupby(["ID","sf"]).mean()).reset_index()
@@ -310,7 +311,7 @@ def readStatsSFFull(data,outDir):
             "tauBottom50",
             "recall",
             "precision"]].to_csv(outDir+"/csv/groupedBySF.csv")
-    
+
     del dataSF
     # del data
     print("< Done grouping transcripts by downsampling factor")
@@ -367,6 +368,43 @@ def readStatsID(dataPrime,outDir):
     data.to_csv(outDir+"/csv/groupedByID.csv")
     print("< Done grouping transcripts by unique ID")
 
+def readStatsStudentTest(data,outDir):
+    data0 = data[~(data['tpm']==0)]
+    numSamples = len(data['sample'].unique().tolist())
+    data05 = pd.DataFrame([])
+    data05[["ID","count"]] = pd.DataFrame(data0.groupby("ID")["tpm"].count()).reset_index()[["ID","tpm"]]
+    data05 = data05[data05["count"]==numSamples]
+    data = data[data["ID"].isin(data05["ID"].unique().tolist())]
+    del data0
+    del data05
+
+    data1 = data[(data["sf"]==1.0)&(data["sample"]==0)]
+    data1 = data1[(data1["tpm"]>10)&(data1["tpm"]<100)]
+    data1.sort_values(by="tpm",ascending=False,inplace=True)
+    dataIDs = data1["ID"].unique().tolist()
+    data = data[data["ID"].isin(dataIDs)]
+    data.sort_values(by="sf",ascending=True,inplace=True)
+    data.reset_index(inplace=True)
+    data.drop("index",axis=1,inplace=True)
+    data1 = pd.DataFrame(data[data["sf"]==1.0].groupby(["ID"]).mean()).reset_index()
+    data = data[~(data["sf"]==1.0)]
+    del dataIDs
+
+    df = pd.DataFrame([])
+    df[["ID","sf","tpmMean"]] = pd.DataFrame(data.groupby(["ID","sf"]).mean()).reset_index()[["ID","sf","tpm"]]
+    df[["ID","sf","tpmMean","covBase","tpmBase"]] = pd.merge(df,data1[["ID","cov","tpm"]],on="ID",how="outer")
+    df["std"] = pd.DataFrame(data.groupby(["ID","sf"])["tpm"].std()).reset_index()["tpm"]
+    df["n"] = pd.DataFrame(data.groupby(["ID","sf"])["tpm"].count()).reset_index()["tpm"]
+    df["df"] = df["n"]-1
+    df["isf"] = t.isf(0.005,df["df"])
+    df["denominator"] = df["std"]/np.sqrt(df["n"])
+    df["score"] = ((df["isf"]*df["denominator"])-df["tpmMean"])*(-1)
+    df["scoreRev"] = df['tpmMean']+(df["tpmMean"]-df["score"])
+    df["fold"] = df["scoreRev"]/df["tpmMean"]
+    df.sort_values(by="tpmBase",inplace=True)
+    df.reset_index(inplace=True)
+    df.to_csv(outDir+"/csv/groupedByID.csv")
+
 def main(args):
     if not os.path.exists(os.path.abspath(args.out)):
         os.makedirs(os.path.abspath(args.out))
@@ -385,7 +423,7 @@ def main(args):
     names =['tissue',
             'chr',
             'refID',
-            'tID',  
+            'tID',
             'start',
             'end',
             'sample',
@@ -394,6 +432,7 @@ def main(args):
             'tpm']
 
     data = pd.read_csv(os.path.abspath(args.input),sep="\t",skiprows=1,names=names,dtype=dtypeC)
+    data['tissue']=data['tissue'].str.strip()
     data["ID"] = data["tissue"]+":"+data["chr"]+":"+data['refID']+":"+data["tID"]+":"+data["start"].astype(str)+"-"+data["end"].astype(str)
     full = True
     try:
@@ -424,7 +463,15 @@ def main(args):
             except:
                 print("Seems the coverage parameter is specified incorectly: ", sys.exc_info())
 
-    if full:
+    if not args.top == None:
+        data.sort_values(by="tpm",ascending=False,inplace=True)
+        dataIDs = data[(data["sf"]==1.0)&(data["sample"]==0)].iloc[:args.top]["ID"].unique().tolist()
+        data = data[data["ID"].isin(dataIDs)]
+        data.sort_values(by="sf",ascending=True,inplace=True)
+        data.reset_index(inplace=True)
+        data.drop("index",axis=1,inplace=True)
+
+    if full and args.top == None:
         readStatsSFFull(data,os.path.abspath(args.out))
     else:
         readStatsSFRange(data,os.path.abspath(args.out))
