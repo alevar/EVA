@@ -104,6 +104,11 @@ def eva(argv):
                                 type=float,
                                 default=False,
                                 help="The value specify at which downsampling factor to resume the run. If set to true - will attempt to resume the previous run (happened a few times that i accidentally exited tmux and killed the process before it was over). It requires that the rest of the parameters are set the same way as before.")
+    parser_assemble.add_argument('-l',
+                                '--gene',
+                                required=False,
+                                action="store_true",
+                                help="If set true will also output data for gene-level analysis")
     parser_assemble.set_defaults(func=Assemble.main)
 
 #===========================================
@@ -129,6 +134,21 @@ def eva(argv):
                                 type=str,
                                 default="full",
                                 help="specify the coverage range to analyze and output")
+    parser_analyze.add_argument('-t',
+                                '--top',
+                                required=False,
+                                type=int,
+                                help="Select only top N transcripts by expression level (TPM) for analysis")
+    parser_analyze.add_argument('-d',
+                                '--de',
+                                required=False,
+                                action="store_true",
+                                help="conduct estimation of statistically significant TPM values for differential expression")
+    parser_assemble.add_argument('-l',
+                                '--gene',
+                                required=False,
+                                type=str,
+                                help="provide gene-lvel assembly results for analysis")
     parser_analyze.set_defaults(func=Analyze.main)
 
 #===========================================
@@ -167,6 +187,11 @@ def eva(argv):
                                 '--gif',
                                 action="store_true",
                                 help="produce animated gifs for graphs across the sampling factor range")
+    parser_assemble.add_argument('-l',
+                                '--gene',
+                                required=False,
+                                type=str,
+                                help="Provide gene-level csv for plotting")
     parser_plot.set_defaults(func=Plot.main)
 
     args=parser.parse_args()
