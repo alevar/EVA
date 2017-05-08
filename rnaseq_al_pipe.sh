@@ -127,7 +127,7 @@ fi
 
 echo [`date +"%Y-%m-%d %H:%M:%S"`] "   * Assemble transcripts (StringTie)"
 $STRINGTIE -p $NUMCPUS -G ${GTFFILE} -e -o ${ALIGNLOC}/${nameM}.gtf \
- -l ${sample} ${ALIGNLOC}/${nameM}.bam
+ -l ${sample} ${ALIGNLOC}/${nameM}.bam -A ${ALIGNLOC}/${nameM}.gene.out
 
 awk -F '\t|;|"| ' '$3 == "transcript" && match($19,/ref_gene_name*/) {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$11"\t"$16"\t"$21"\t"$26"\t"$31"\t"$36"\t"$41"\t"$46}' ${ALIGNLOC}/${nameM}.gtf > ${ALIGNLOC%/*}/transcripts.gtf
 
