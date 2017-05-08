@@ -79,7 +79,7 @@ def plotTauSF(data,outDir,res):
     ax2.set_xlabel("# aligned spots")
     ticks2F = [str('%.2f' %((elem*spotsOriginal)/1000000))+"M" for elem in data["sf"].tolist()]
     ax2.set_xticklabels(ticks2F)
-    
+
     numTransc = int(data[data["sf"]==1.0]["NumTranscripts"]/120)
     caption = "Figure. Plot shows the change in Kendall's tau ranking correlation coefficient between the ranking of transcripts by expression levels(TPM) using all reads in the alignment and the ranking of same transcripts using a portion of aligned reads. Assembly and expression estimation was performed using stringtie. Original number of aligned reads is "+str(spotsOriginal)+". Number of transcripts is "+str(numTransc)+"."
     # plt.figtext(.05, .05, caption,wrap=True,fontsize=18)
@@ -125,7 +125,7 @@ def plotPCAFull(data,outDir,res):
     for i in range(n):
         ax1.arrow(0, 0, sklearn_pca.components_[0,i]*-1, sklearn_pca.components_[1,i],color='r',alpha=1.0)
         ax1.annotate(labels[i],(sklearn_pca.components_[0,i]*-1.15, sklearn_pca.components_[1,i] * 1.15))
-    
+
     ticks2F = [str('%.2f' %((elem*spotsOriginal)/1000000))+"M" for elem in data["sf"].tolist()]
     for i, txt in enumerate(data["sf"].tolist()):
         ax1.annotate(str(txt)+" ("+ticks2F[i]+")", (xs[i],ys[i]))
@@ -157,7 +157,7 @@ def plotPCARange(data,outDir,res):
     for i in range(n):
         ax1.arrow(0, 0, sklearn_pca.components_[0,i]*-1, sklearn_pca.components_[1,i],color='r',alpha=1.0)
         ax1.annotate(labels[i],(sklearn_pca.components_[0,i]*-1.15, sklearn_pca.components_[1,i] * 1.15))
-    
+
     ticks2F = [str('%.2f' %((elem*spotsOriginal)/1000000))+"M" for elem in data["sf"].tolist()]
     for i, txt in enumerate(data["sf"].tolist()):
         ax1.annotate(str(txt)+" ("+ticks2F[i]+")", (xs[i],ys[i]))
@@ -340,8 +340,11 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         plt.clf()
         plt.figure(figsize=(int(res[0]), int(res[1])))
         plt.title('Change in median, 2nd and 3rd quartiles of transcript expression levels(TPM)')
-        plt.xticks(np.arange(min(eDF["covBase"]), max(eDF["covBase"])+1, (max(eDF["covBase"])-min(eDF["covBase"]))/20).tolist())
-        plt.yticks(np.arange(min(eDF["tpmQ50"]), max(eDF["tpmQ50"])+1, (max(eDF["tpmQ50"])-min(eDF["tpmQ50"]))/20).tolist())
+        try:
+            plt.xticks(np.arange(min(eDF["covBase"]), max(eDF["covBase"])+1, (max(eDF["covBase"])-min(eDF["covBase"]))/20).tolist())
+            plt.yticks(np.arange(min(eDF["tpmQ50"]), max(eDF["tpmQ50"])+1, (max(eDF["tpmQ50"])-min(eDF["tpmQ50"]))/20).tolist())
+        except:
+            pass
         plt.ylabel('Deviation of expression estimate from control (% TPM)')
         plt.xlabel("Transcript Coverage")
         plt.plot(eDF[eDF["sf"]==sf]["covBase"], eDF[eDF["sf"]==sf]["tpmQ50"],'k',color='#CC4F1B',lw=0.25)
@@ -351,14 +354,17 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         plt.savefig(outDir+"/png/"+str(sf)+"boxIDTransformed.png")
         if gif == True:
             ims.append((eDF[eDF["sf"]==sf]["covBase"],eDF[eDF["sf"]==sf]["tpmQ50"]))
-            
+
         plt.close("all")
         plt.clf()
         plt.figure(figsize=(int(res[0]),int(res[1])))
         plt.title("Number of false negatives versus coverage")
         plt.ylabel('Number of false negatives')
         plt.xlabel("Coverage")
-        plt.xticks(np.arange(min(dataTMP["covBase"]), max(dataTMP["covBase"])+1, (max(dataTMP["covBase"])-min(dataTMP["covBase"]))/20).tolist())
+        try:
+            plt.xticks(np.arange(min(dataTMP["covBase"]), max(dataTMP["covBase"])+1, (max(dataTMP["covBase"])-min(dataTMP["covBase"]))/20).tolist())
+        except:
+            pass
         plt.plot(dataTMP["covBase"], dataTMP["falseNegative"],'k',color='#CC4F1B',lw=0.25)
         spotsRetained = spotsOriginal*sf
         caption = "Figure. Number of false negatives reported across all random downsamplings to "+str(sf*100)+"%% spots retained for each transcript."
@@ -392,6 +398,20 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         ims3.reverse()
         im_ani3 = animation.FuncAnimation(fig3, update_line3, len(unique),fargs=(list(reversed(unique)),), interval=600, blit=True)
         im_ani3.save(outDir+'/png/falseNegatives.gif',writer="imagemagick",dpi=50)
+
+def plotNormalityOfSamples(data,outDir,res):
+    dataID = data[["ID","sf","tpm"]].groupby(by=["ID","sf","sample"])
+    dataID2 = dataID['tpm'].agg([np.mean, np.median, np.std])
+    dataID2.reset_index(inplace=True)
+    dataID2["norm"] = (3*(dataID2["mean"]-dataID2["median"]))/dataID2["std"] # Persons coefficient of skewness
+
+    dataID2 = dataID2.dropna()
+    for sf in dataID2['sf'].unique().tolist()[:-1]:
+        count, division = np.histogram(dataID2[dataID2["sf"]==sf]["norm"])
+        mids=[(division[idx+1]+division[idx])/2 for idx in range(len(division)-1)]
+        plt.scatter(mids,count,label=sf)
+    plt.legend()
+    plt.savefig(outDir+"/png/"+str(sf)+"sampleNormality.png")
 
 def main(args):
     if not os.path.exists(os.path.abspath(args.out)):
@@ -434,6 +454,7 @@ def main(args):
         plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
         plotTauSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
         if (len(dataSF["recall"].unique()) == 1) and np.isnan(dataSF["recall"].unique().tolist()[0]):
+            dataSF.fillna(0,inplace=True)
             plotScattermatrixSFRange(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
             plotPCARange(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
             plotPrecision(dataSF,os.path.abspath(args.out),args.resolution.split(":"))

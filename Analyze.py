@@ -77,7 +77,7 @@ def KendalTau(df,dfBASE,topF=1.0,orderTop=True):
     del uniqueCOMBINATION
     return tau["rank"]["1.0"]
 
-def readStatsSFRange(data,outDir):
+def readStatsSFRange(data,outDir,gene=False):
     print("> Begin grouping transcripts by downsampling factor")
 
     # Aggregate a column for uniqueID
@@ -165,38 +165,66 @@ def readStatsSFRange(data,outDir):
     dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
     dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
     print(" << Done Ranking and Tau coeeficient calculation")
-    dataSF[["sf",
-            "cov",
-            "tpm",
-            "falsePositives",
-            "falseNegatives",
-            "falseNegativesFull",
-            "NumTranscripts",
-            "q25",
-            "median",
-            "q75",
-            "mean",
-            "whiskLow",
-            "whiskHigh",
-            "weightedNumExtremes",
-            "weightedNormalizedNumExtremes",
-            "std",
-            "cv",
-            "tauFull",
-            "tauTop10",
-            "tauTop20",
-            "tauTop50",
-            "tauBottom10",
-            "tauBottom20",
-            "tauBottom50",
-            "recall",
-            "precision"]].to_csv(outDir+"/csv/groupedBySF.csv")
+    if gene==True:
+        dataSF[["sf",
+                "cov",
+                "tpm",
+                "falsePositives",
+                "falseNegatives",
+                "falseNegativesFull",
+                "NumTranscripts",
+                "q25",
+                "median",
+                "q75",
+                "mean",
+                "whiskLow",
+                "whiskHigh",
+                "weightedNumExtremes",
+                "weightedNormalizedNumExtremes",
+                "std",
+                "cv",
+                "tauFull",
+                "tauTop10",
+                "tauTop20",
+                "tauTop50",
+                "tauBottom10",
+                "tauBottom20",
+                "tauBottom50",
+                "recall",
+                "precision"]].to_csv(outDir+"/csv/groupedGeneBySF.csv")
+    else:
+        dataSF[["sf",
+                "cov",
+                "tpm",
+                "falsePositives",
+                "falseNegatives",
+                "falseNegativesFull",
+                "NumTranscripts",
+                "q25",
+                "median",
+                "q75",
+                "mean",
+                "whiskLow",
+                "whiskHigh",
+                "weightedNumExtremes",
+                "weightedNormalizedNumExtremes",
+                "std",
+                "cv",
+                "tauFull",
+                "tauTop10",
+                "tauTop20",
+                "tauTop50",
+                "tauBottom10",
+                "tauBottom20",
+                "tauBottom50",
+                "recall",
+                "precision"]].to_csv(outDir+"/csv/groupedTranscriptBySF.csv")
 
     del dataSF
     # del data
     print("< Done grouping transcripts by downsampling factor")
 
-def readStatsSFFull(data,outDir):
+def readStatsSFFull(data,outDir,gene=False):
     print("> Begin grouping transcripts by downsampling factor")
 
     # Aggregate a column for uniqueID
@@ -285,38 +313,66 @@ def readStatsSFFull(data,outDir):
     dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
     dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
     print(" << Done Ranking and Tau coeeficient calculation")
-    dataSF[["sf",
-            "cov",
-            "tpm",
-            "falsePositives",
-            "falseNegatives",
-            "falseNegativesFull",
-            "NumTranscripts",
-            "q25",
-            "median",
-            "q75",
-            "mean",
-            "whiskLow",
-            "whiskHigh",
-            "weightedNumExtremes",
-            "weightedNormalizedNumExtremes",
-            "std",
-            "cv",
-            "tauFull",
-            "tauTop10",
-            "tauTop20",
-            "tauTop50",
-            "tauBottom10",
-            "tauBottom20",
-            "tauBottom50",
-            "recall",
-            "precision"]].to_csv(outDir+"/csv/groupedBySF.csv")
+    if gene==True:
+        dataSF[["sf",
+                "cov",
+                "tpm",
+                "falsePositives",
+                "falseNegatives",
+                "falseNegativesFull",
+                "NumTranscripts",
+                "q25",
+                "median",
+                "q75",
+                "mean",
+                "whiskLow",
+                "whiskHigh",
+                "weightedNumExtremes",
+                "weightedNormalizedNumExtremes",
+                "std",
+                "cv",
+                "tauFull",
+                "tauTop10",
+                "tauTop20",
+                "tauTop50",
+                "tauBottom10",
+                "tauBottom20",
+                "tauBottom50",
+                "recall",
+                "precision"]].to_csv(outDir+"/csv/groupedGeneBySF.csv")
+    else:
+        dataSF[["sf",
+                "cov",
+                "tpm",
+                "falsePositives",
+                "falseNegatives",
+                "falseNegativesFull",
+                "NumTranscripts",
+                "q25",
+                "median",
+                "q75",
+                "mean",
+                "whiskLow",
+                "whiskHigh",
+                "weightedNumExtremes",
+                "weightedNormalizedNumExtremes",
+                "std",
+                "cv",
+                "tauFull",
+                "tauTop10",
+                "tauTop20",
+                "tauTop50",
+                "tauBottom10",
+                "tauBottom20",
+                "tauBottom50",
+                "recall",
+                "precision"]].to_csv(outDir+"/csv/groupedTranscriptBySF.csv")
 
     del dataSF
     # del data
     print("< Done grouping transcripts by downsampling factor")
 
-def readStatsID(dataPrime,outDir):
+def readStatsID(dataPrime,outDir,gene=False):
     print("> Begin grouping transcripts by unique ID")
     # dataPrime["ID"] = dataPrime["tissue"]+":"+dataPrime["chr"]+":"+dataPrime['refID']+":"+dataPrime["tID"]+":"+dataPrime["start"].astype(str)+"-"+dataPrime["end"].astype(str)
     # Aggregate a column for uniqueID
@@ -365,45 +421,56 @@ def readStatsID(dataPrime,outDir):
             'sf']])
     data=pd.concat(frames)
     data=data.reset_index(drop=True)
-    data.to_csv(outDir+"/csv/groupedByID.csv")
+    if gene==True:
+        data.to_csv(outDir+"/csv/groupedGeneByID.csv")
+    else:
+        data.to_csv(outDir+"/csv/groupedTranscriptByID.csv")
     print("< Done grouping transcripts by unique ID")
 
-def readStatsStudentTest(data,outDir):
-    data0 = data[~(data['tpm']==0)]
+def readStatsStudentTest(data,outDir,gene=False):
+    data0 = data[~(data['tpm']==0.0)]
     numSamples = len(data['sample'].unique().tolist())
+    numSF = len(data['sf'].unique().tolist())
     data05 = pd.DataFrame([])
     data05[["ID","count"]] = pd.DataFrame(data0.groupby("ID")["tpm"].count()).reset_index()[["ID","tpm"]]
-    data05 = data05[data05["count"]==numSamples]
-    data = data[data["ID"].isin(data05["ID"].unique().tolist())]
     del data0
+    data5 = data05[data05["count"]==numSamples*numSF]
     del data05
+    dataT = data[data["ID"].isin(data5["ID"].unique().tolist())]
+    del data5
 
-    data1 = data[(data["sf"]==1.0)&(data["sample"]==0)]
-    data1 = data1[(data1["tpm"]>10)&(data1["tpm"]<100)]
-    data1.sort_values(by="tpm",ascending=False,inplace=True)
-    dataIDs = data1["ID"].unique().tolist()
-    data = data[data["ID"].isin(dataIDs)]
-    data.sort_values(by="sf",ascending=True,inplace=True)
-    data.reset_index(inplace=True)
-    data.drop("index",axis=1,inplace=True)
-    data1 = pd.DataFrame(data[data["sf"]==1.0].groupby(["ID"]).mean()).reset_index()
-    data = data[~(data["sf"]==1.0)]
-    del dataIDs
+    dataT.sort_values(by="tpm",ascending=False,inplace=True)
+    dataIDs = dataT[(dataT["sf"]==1.0)&(dataT["sample"]==0)]["ID"].unique().tolist()
+    dataT = dataT[dataT["ID"].isin(dataIDs)]
+    dataT.reset_index(inplace=True)
+    dataT.drop("index",axis=1,inplace=True)
+    data1 = pd.DataFrame(dataT[dataT["sf"]==1.0].groupby(["ID"]).mean()).reset_index()
+    dataT = dataT[~(dataT["sf"]==1.0)]
+    dataT.reset_index(inplace=True)
+    dataT.drop("index",axis=1,inplace=True)
 
     df = pd.DataFrame([])
-    df[["ID","sf","tpmMean"]] = pd.DataFrame(data.groupby(["ID","sf"]).mean()).reset_index()[["ID","sf","tpm"]]
+    df[["ID","sf","tpmMean"]] = pd.DataFrame(dataT.groupby(["ID","sf"]).mean()).reset_index()[["ID","sf","tpm"]]
     df[["ID","sf","tpmMean","covBase","tpmBase"]] = pd.merge(df,data1[["ID","cov","tpm"]],on="ID",how="outer")
-    df["std"] = pd.DataFrame(data.groupby(["ID","sf"])["tpm"].std()).reset_index()["tpm"]
-    df["n"] = pd.DataFrame(data.groupby(["ID","sf"])["tpm"].count()).reset_index()["tpm"]
+    del data1
+    df["std"] = pd.DataFrame(dataT.groupby(["ID","sf"])["tpm"].std()).reset_index()["tpm"]
+    df["n"] = pd.DataFrame(dataT.groupby(["ID","sf"])["tpm"].count()).reset_index()["tpm"]
+    del dataT
     df["df"] = df["n"]-1
-    df["isf"] = t.isf(0.005,df["df"])
+    df["isf"] = t.isf(0.01,df["df"])
     df["denominator"] = df["std"]/np.sqrt(df["n"])
     df["score"] = ((df["isf"]*df["denominator"])-df["tpmMean"])*(-1)
     df["scoreRev"] = df['tpmMean']+(df["tpmMean"]-df["score"])
     df["fold"] = df["scoreRev"]/df["tpmMean"]
+    # df = df[(df["tpmBase"]>500)&(df["tpmBase"]<1000)]
     df.sort_values(by="tpmBase",inplace=True)
     df.reset_index(inplace=True)
-    df.to_csv(outDir+"/csv/groupedByID.csv")
+    df.drop("index",axis=1,inplace=True)
+    if gene==True:
+        df.to_csv(outDir+"/csv/groupedGeneByID.csv")
+    else:
+        df.to_csv(outDir+"/csv/groupedTranscriptByID.csv")
+    del df
 
 def main(args):
     if not os.path.exists(os.path.abspath(args.out)):
@@ -476,4 +543,58 @@ def main(args):
     else:
         readStatsSFRange(data,os.path.abspath(args.out))
 
+    if not args.de == None:
+        readStatsStudentTest(data,os.path.abspath(args.out))
+
     readStatsID(data,os.path.abspath(args.out))
+
+    if not args.gene == None: # analyze gene-level expression
+        data = pd.read_csv(os.path.abspath(args.gene)).drop(["Unnamed: 0","Strand","Start","End","FPKM"],axis=1)
+        columns = ["geneID","geneName","chr","cov","tpm","tissue","sf","sample"]
+        data.columns = columns
+        full = True
+        try:
+            iqrC = float(args.coverage)
+            # lets try identifying upper outliers in covBase
+            q25,q50,q75 = data['cov'].quantile([0.25,0.5,0.75])
+            iqr = q75-q25
+            thw = q75+iqrC*iqr
+            tlw = q25-iqrC*iqr
+            ahw = data[data["cov"]<thw]["cov"].max()
+            alw = data[data["cov"]>tlw]["cov"].min()
+            transcs = data[(data['cov']<ahw)&(data['cov']>alw)&(data["sf"]==1.0)]["ID"].unique()
+            data = data[data["ID"].isin(transcs)]
+            data.reset_index(inplace=True)
+            data = data.drop("index",axis=1)
+            full = False
+        except:
+            if args.coverage == "full":
+                full = True
+            else:
+                try:
+                    bounds = args.coverage.split(":")
+                    transcripts = data[(data['cov']<float(bounds[1]))&(data['cov']>float(bounds[0]))&(data["sf"]==1.0)]["ID"].unique()
+                    data = data[data["ID"].isin(transcripts)]
+                    data.reset_index(inplace=True)
+                    data = data.drop("index",axis=1)
+                    full = False
+                except:
+                    print("Seems the coverage parameter is specified incorectly: ", sys.exc_info())
+
+        if not args.top == None:
+            data.sort_values(by="tpm",ascending=False,inplace=True)
+            dataIDs = data[(data["sf"]==1.0)&(data["sample"]==0)].iloc[:args.top]["ID"].unique().tolist()
+            data = data[data["ID"].isin(dataIDs)]
+            data.sort_values(by="sf",ascending=True,inplace=True)
+            data.reset_index(inplace=True)
+            data.drop("index",axis=1,inplace=True)
+
+        if full and args.top == None:
+            readStatsSFFull(data,os.path.abspath(args.out),True)
+        else:
+            readStatsSFRange(data,os.path.abspath(args.out),True)
+
+        if not args.de == None:
+            readStatsStudentTest(data,os.path.abspath(args.out),True)
+
+        readStatsID(data,os.path.abspath(args.out),True)

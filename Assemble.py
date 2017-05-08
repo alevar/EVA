@@ -113,8 +113,9 @@ def main(args):
 
     if args.stats is not None:
         statFilePath = args.stats
+        statFilePath = "".join(statFilePath.split(".")[:-1])+"_Transcript"+statFilePath.split(".")[-1]
     else:
-        statFilePath = outDir+"/stats.log"
+        statFilePath = outDir+"/statsTranscript.log"
 
     parent(inputs,outDir,covRange,numReps,sequenceRef,annotationRef,threading,args.cont)
 
@@ -132,3 +133,29 @@ def main(args):
                 params=[statFilePath,sf,rep]
                 endDir = outDir+"/"+sample+"/"+sample+"_F:"+str(sf)+"_R:"+str(rep)
                 parseDir(endDir,sample,params)
+
+    if args.gene == True:
+        data = pd.DataFrame([])
+        lsDF = []
+
+        for d in os.listdir(outDir):
+            pathD = os.path.abspath(outDir+"/"+d)
+            if os.path.isdir(pathD):
+                for subd in os.listdir(pathD):
+                    pathSubD = os.path.abspath(pathD+"/"+subd)
+                    if os.path.isdir(pathSubD):
+                        sf = subd.split("_")[-2].split(":")[-1]
+                        rep = subd.split("_")[-1].split(":")[-1]
+                        fullPath = pathSubD+"/hisat2/"+d+".gene.out"
+                        tempDF = pd.read_csv(fullPath,sep="\t")
+                        tempDF["tissue"] = d
+                        tempDF["sf"] = sf
+                        tempDF["rep"] = rep
+                        lsDF.append(tempDF)
+
+        data = pd.concat(lsDF)
+        if args.stats is not None:
+            statFilePath = args.stats
+            data.to_csv("".join(statFilePath.split(".")[:-1])+"_Gene"+statFilePath.split(".")[-1])
+        else:
+            data.to_csv(outDir+"/statsGene.log")
