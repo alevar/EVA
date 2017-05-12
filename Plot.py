@@ -25,7 +25,7 @@ mpl.rcParams['agg.path.chunksize'] = 10000
 
 spotsOriginal = 92884447 # Mean number of spots in the selected alignments. eventually will be suplied by the program
 
-def plotBoxSF(data,outDir,res):
+def plotBoxSF(data,outDir,res,param):
     # First we plotted the median and quartiles
     plt.close('all')
     plt.clf()
@@ -34,12 +34,12 @@ def plotBoxSF(data,outDir,res):
     ax1.set_title('Change in variation of transcript expression (%TPM) estimation as a function of the portion of aligned spots')
     ax1.set_ylabel('Deviation of expression estimate from control (% TPM)')
     ax1.set_xlabel("Portion of aligned spots")
-    ax1.plot(data["sf"], data["median"],'k',color='#CC4F1B')
+    ax1.plot(data["sf"], data[param+"_median"],'k',color='#CC4F1B')
     ax1.set_xlim(data["sf"].min(),data["sf"].max())
     ax1.set_xticks(data["sf"])
-    ax1.fill_between(data["sf"], data["q25"], data["q75"],
+    ax1.fill_between(data["sf"], data[param+"_q25"], data[param+"_q75"],
         alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
-    ax1.fill_between(data["sf"], data["whiskLow"], data["whiskHigh"],
+    ax1.fill_between(data["sf"], data[param+"_whiskLow"], data[param+"_whiskHigh"],
         alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
 
     ax2 = fig.add_axes((0.1,0.2,0.8,0.0))
@@ -52,7 +52,7 @@ def plotBoxSF(data,outDir,res):
 
     caption = "Figure. Plot shows the change in variation of estimated transcript expression levels (%TPM) as a function of the number of aligned reads used in the assembly. The plot shows the median and four quartiles of the distribution of estimated expression levels (%TPM) for each downsampling."
     # plt.figtext(.05, .05, caption,wrap=True,fontsize=18)
-    plt.savefig(outDir+"/png/boxSF.png")
+    plt.savefig(outDir+"/png/boxSF"+param+".png")
     plt.close('all')
     plt.clf()
 
@@ -88,7 +88,7 @@ def plotTauSF(data,outDir,res):
 def plotScattermatrixSFFull(data,outDir,res):
     # Then we created a scatter matrix of each quantitative measure with density plots on the diagonal
     # The data was visually inspected to determine any signs of linearity
-    ax=sbn.pairplot(data[['sf','falsePositives','falseNegatives','falseNegativesFull','std','tauFull','median']])
+    ax=sbn.pairplot(data[['sf','falsePositives','falseNegatives','falseNegativesFull','pa_std','tauFull','pa_median']])
     caption = "Figure. Pairplot of ... The diagonal shows distibutions of ..."
     # plt.figtext(.05, .05, caption,wrap=True,fontsize=18)
     plt.savefig(outDir+"/png/scatterMatrixSF.png")
@@ -96,7 +96,7 @@ def plotScattermatrixSFFull(data,outDir,res):
 def plotScattermatrixSFRange(data,outDir,res):
     # Then we created a scatter matrix of each quantitative measure with density plots on the diagonal
     # The data was visually inspected to determine any signs of linearity
-    ax=sbn.pairplot(data[['sf','falseNegatives','falseNegativesFull','std','tauFull','median']])
+    ax=sbn.pairplot(data[['sf','falseNegatives','falseNegativesFull','pa_std','tauFull','pa_median']])
     caption = "Figure. Pairplot of ... The diagonal shows distibutions of ..."
     # plt.figtext(.05, .05, caption,wrap=True,fontsize=18)
     plt.savefig(outDir+"/png/scatterMatrixSF.png")
@@ -105,7 +105,7 @@ def plotPCAFull(data,outDir,res):
     plt.close("all")
     plt.clf()
     Y = data["sf"]
-    X = data[["falsePositives","falseNegatives","falseNegativesFull","median","weightedNormalizedNumExtremes","std","tauFull"]]
+    X = data[["falsePositives","falseNegatives","falseNegativesFull","pa_median","pa_weightedNormalizedNumExtremes","pa_std","tauFull"]]
     X_std = StandardScaler().fit_transform(X)
 
     sklearn_pca = sklearnPCA(n_components=2)
@@ -113,7 +113,7 @@ def plotPCAFull(data,outDir,res):
 
     xs=Y_sklearn[:,0]
     ys=Y_sklearn[:,1]*-1
-    labels = ["falsePositives","falseNegatives","falseNegativesFull","median","weightedNormalizedNumExtremes","std","tauFull"]
+    labels = ["falsePositives","falseNegatives","falseNegativesFull","pa_median","pa_weightedNormalizedNumExtremes","pa_std","tauFull"]
     fig = plt.figure(figsize=(int(res[0]),int(res[1])))
     ax1 = fig.add_axes((0.1,0.1,0.8,0.85))
     ax1.set_title("PCA1 versus PCA2")
@@ -137,7 +137,7 @@ def plotPCARange(data,outDir,res):
     plt.close("all")
     plt.clf()
     Y = data["sf"]
-    X = data[["falseNegatives","falseNegativesFull","median","weightedNormalizedNumExtremes","std","tauFull"]]
+    X = data[["falseNegatives","falseNegativesFull","pa_median","pa_weightedNormalizedNumExtremes","pa_std","tauFull"]]
     X_std = StandardScaler().fit_transform(X)
 
     sklearn_pca = sklearnPCA(n_components=2)
@@ -145,7 +145,7 @@ def plotPCARange(data,outDir,res):
 
     xs=Y_sklearn[:,0]
     ys=Y_sklearn[:,1]*-1
-    labels = ["falseNegatives","falseNegativesFull","median","weightedNormalizedNumExtremes","std","tauFull"]
+    labels = ["falseNegatives","falseNegativesFull","pa_median","pa_weightedNormalizedNumExtremes","pa_std","tauFull"]
     fig = plt.figure(figsize=(int(res[0]),int(res[1])))
     ax1 = fig.add_axes((0.1,0.1,0.8,0.85))
     ax1.set_title("PCA1 versus PCA2")
@@ -247,12 +247,12 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
 
     distXCovBase = (max(data["covBase"])-min(data["covBase"]))
     distXCovBaseT = (max(eDF["covBase"])-min(eDF["covBase"]))
-    distYExp = (max(data["tpmQ75"])-min(data["tpmQ25"]))
-    distYExpT = (max(data["tpmQ50"])-min(data["tpmQ50"]))
+    distYExp = (max(data["paQ75"])-min(data["paQ25"]))
+    distYExpT = (max(data["paQ50"])-min(data["paQ50"]))
     tickXCovBase = np.arange(min(data["covBase"]), max(data["covBase"])+distXCovBase*0.01, distXCovBase/20).tolist()
     tickXCovBaseT = np.arange(min(eDF["covBase"]), max(eDF["covBase"])+distXCovBaseT*0.01, distXCovBaseT/20).tolist()
-    tickYExp = np.arange(min(data["tpmQ25"]), max(data["tpmQ75"])+distYExp*0.01, distYExp/20).tolist()
-    tickYExpT = np.arange(min(data["tpmQ50"]), max(data["tpmQ50"])+distYExpT*0.01, distYExpT/20).tolist()
+    tickYExp = np.arange(min(data["paQ25"]), max(data["paQ75"])+distYExp*0.01, distYExp/20).tolist()
+    tickYExpT = np.arange(min(data["paQ50"]), max(data["paQ50"])+distYExpT*0.01, distYExpT/20).tolist()
 
     plt.close("all")
     plt.clf()
@@ -261,7 +261,7 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
     ims = []
     line, = plt.plot([], [], lw=0.25)
     plt.xlim(eDF["covBase"].min(), eDF["covBase"].max())
-    plt.ylim(data["tpmQ50"].min(), data["tpmQ50"].max())
+    plt.ylim(data["paQ50"].min(), data["paQ50"].max())
     def update_line(i,sfs):
         line.set_xdata(ims[i][0])
         line.set_ydata(ims[i][1])
@@ -277,7 +277,7 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
     ims2 = []
     line2, = plt.plot([], [], lw=0.25)
     plt.xlim(data["covBase"].min(), data["covBase"].max())
-    plt.ylim(data["tpmQ50"].min(), data["tpmQ50"].max())
+    plt.ylim(data["paQ50"].min(), data["paQ50"].max())
     def update_line2(i,sfs):
         line2.set_xdata(ims2[i][0])
         line2.set_ydata(ims2[i][1])
@@ -306,16 +306,17 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         return line3,
 
     unique=data["sf"].unique().tolist()
-    for sf in unique:
+    unique.sort()
+    for sf in unique[:-1]:
         print("Plotting: ",sf)
         dataTMP = data[data["sf"]==sf]
 
         plt.close("all")
-        ax=sbn.pairplot(dataTMP[['covBase','falseNegative','tpmMEAN','tpmQ50','tpmIQR','tpmSTD']],size=2,aspect=1)
+        ax=sbn.pairplot(dataTMP[['covBase','falseNegative','paMEAN','paQ50','paIQR','paSTD']],size=2,aspect=1)
         ax.savefig(outDir+"/png/"+str(sf)+"scatterMatrixByID.png")
 
         plt.close("all")
-        ax=sbn.pairplot(eDF[eDF["sf"]==sf][['covBase','falseNegative','tpmMEAN','tpmQ50','tpmIQR','tpmSTD']],size=2,aspect=1)
+        ax=sbn.pairplot(eDF[eDF["sf"]==sf][['covBase','falseNegative','paMEAN','paQ50','paIQR','paSTD']],size=2,aspect=1)
         ax.savefig(outDir+"/png/"+str(sf)+"scatterMatrixByIDTransformed.png")
 
         plt.close('all')
@@ -323,18 +324,18 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         plt.figure(figsize=(int(res[0]), int(res[1])))
         plt.title('Normalized TPM Deviation')
         plt.xticks(np.arange(min(dataTMP["covBase"]), max(dataTMP["covBase"])+1, (max(dataTMP["covBase"])-min(dataTMP["covBase"]))/20).tolist())
-        plt.yticks(np.arange(min(dataTMP["tpmQ25"]), max(dataTMP["tpmQ75"])+1, (max(dataTMP["tpmQ75"])-min(dataTMP["tpmQ25"]))/20).tolist())
+        plt.yticks(np.arange(min(dataTMP["paQ25"]), max(dataTMP["paQ75"])+1, (max(dataTMP["paQ75"])-min(dataTMP["paQ25"]))/20).tolist())
         plt.ylabel('Deviation of expression estimate from control (% TPM)')
         plt.xlabel("Transcript Coverage")
-        plt.plot(dataTMP["covBase"], dataTMP["tpmQ50"],'k',color='#CC4F1B',lw=0.25)
-        plt.fill_between(dataTMP["covBase"], dataTMP["tpmQ25"], dataTMP["tpmQ75"],
+        plt.plot(dataTMP["covBase"], dataTMP["paQ50"],'k',color='#CC4F1B',lw=0.25)
+        plt.fill_between(dataTMP["covBase"], dataTMP["paQ25"], dataTMP["paQ75"],
             alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
         spotsRetained = spotsOriginal*sf
         caption = "Figure. Change in median of transcript expression levels(TPM) at "+str(sf*100)+"%% of original numner of spots or mean of "+str(int(spotsRetained))+" spots across 12 alignments"
         # plt.figtext(.02, .02, caption,wrap=True)
         plt.savefig(outDir+"/png/"+str(sf)+"boxID.png")
         if gif == True:
-            ims2.append((dataTMP["covBase"],dataTMP["tpmQ50"]))
+            ims2.append((dataTMP["covBase"],dataTMP["paQ50"]))
 
         plt.close('all')
         plt.clf()
@@ -342,18 +343,18 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         plt.title('Change in median, 2nd and 3rd quartiles of transcript expression levels(TPM)')
         try:
             plt.xticks(np.arange(min(eDF["covBase"]), max(eDF["covBase"])+1, (max(eDF["covBase"])-min(eDF["covBase"]))/20).tolist())
-            plt.yticks(np.arange(min(eDF["tpmQ50"]), max(eDF["tpmQ50"])+1, (max(eDF["tpmQ50"])-min(eDF["tpmQ50"]))/20).tolist())
+            plt.yticks(np.arange(min(eDF["paQ50"]), max(eDF["paQ50"])+1, (max(eDF["paQ50"])-min(eDF["paQ50"]))/20).tolist())
         except:
             pass
         plt.ylabel('Deviation of expression estimate from control (% TPM)')
         plt.xlabel("Transcript Coverage")
-        plt.plot(eDF[eDF["sf"]==sf]["covBase"], eDF[eDF["sf"]==sf]["tpmQ50"],'k',color='#CC4F1B',lw=0.25)
+        plt.plot(eDF[eDF["sf"]==sf]["covBase"], eDF[eDF["sf"]==sf]["paQ50"],'k',color='#CC4F1B',lw=0.25)
         spotsRetained = spotsOriginal*sf
         caption = "Figure. Change in median of transcript expression levels(TPM) at "+str(sf*100)+"%% of original numner of spots or mean of "+str(int(spotsRetained))+" spots across 12 alignments. A BoxCoxTransformation was applied to coverage values to normalize the distribution."
         # plt.figtext(.02, .02, caption,wrap=True)
         plt.savefig(outDir+"/png/"+str(sf)+"boxIDTransformed.png")
         if gif == True:
-            ims.append((eDF[eDF["sf"]==sf]["covBase"],eDF[eDF["sf"]==sf]["tpmQ50"]))
+            ims.append((eDF[eDF["sf"]==sf]["covBase"],eDF[eDF["sf"]==sf]["paQ50"]))
 
         plt.close("all")
         plt.clf()
@@ -400,14 +401,9 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         im_ani3.save(outDir+'/png/falseNegatives.gif',writer="imagemagick",dpi=50)
 
 def plotNormalityOfSamples(data,outDir,res):
-    dataID = data[["ID","sf","tpm"]].groupby(by=["ID","sf","sample"])
-    dataID2 = dataID['tpm'].agg([np.mean, np.median, np.std])
-    dataID2.reset_index(inplace=True)
-    dataID2["norm"] = (3*(dataID2["mean"]-dataID2["median"]))/dataID2["std"] # Persons coefficient of skewness
-
-    dataID2 = dataID2.dropna()
-    for sf in dataID2['sf'].unique().tolist()[:-1]:
-        count, division = np.histogram(dataID2[dataID2["sf"]==sf]["norm"])
+    data = data.dropna()
+    for sf in np.sort(data['sf'].unique().tolist())[:-1]:
+        count, division = np.histogram(data[data["sf"]==sf]["tpmNORM"])
         mids=[(division[idx+1]+division[idx])/2 for idx in range(len(division)-1)]
         plt.scatter(mids,count,label=sf)
     plt.legend()
@@ -422,23 +418,33 @@ def main(args):
         os.makedirs(os.path.abspath(args.out)+'/png')
 
     if not args.sf == None:
-        headersSF = ["sf",
-                    "cov",
-                    "tpm",
+        headersSF =["sf",
                     "falsePositives",
                     "falseNegatives",
                     "falseNegativesFull",
                     "NumTranscripts",
-                    "q25",
-                    "median",
-                    "q75",
-                    "mean",
-                    "whiskLow",
-                    "whiskHigh",
-                    "weightedNumExtremes",
-                    "weightedNormalizedNumExtremes",
-                    "std",
-                    "cv",
+                    "pa_q25",
+                    "pa_median",
+                    "pa_q75",
+                    "pa_mean",
+                    "pa_whiskLow",
+                    "pa_whiskHigh",
+                    "pa_weightedNumExtremes",
+                    "pa_weightedNormalizedNumExtremes",
+                    "pa_std",
+                    "pa_cv",
+                    "std_q25",
+                    "std_median",
+                    "std_q75",
+                    "std_mean",
+                    "std_whiskLow",
+                    "std_whiskHigh",
+                    "cv_q25",
+                    "cv_median",
+                    "cv_q75",
+                    "cv_mean",
+                    "cv_whiskLow",
+                    "cv_whiskHigh",
                     "tauFull",
                     "tauTop10",
                     "tauTop20",
@@ -451,7 +457,9 @@ def main(args):
 
         dataSF = pd.read_csv(os.path.abspath(args.sf)).drop("Unnamed: 0",axis=1)
         dataSF.columns = headersSF
-        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
+        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"pa")
+        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"std")
+        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"cv")
         plotTauSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
         if (len(dataSF["recall"].unique()) == 1) and np.isnan(dataSF["recall"].unique().tolist()[0]):
             dataSF.fillna(0,inplace=True)
@@ -475,7 +483,17 @@ def main(args):
                     'tpmQ75',
                     'tpmCV',
                     'tpmIQR',
+                    'tpmNORM',
+                    'paMEAN',
+                    'paSTD',
+                    'paQ25',
+                    'paQ50',
+                    'paQ75',
+                    'paCV',
+                    'paIQR',
+                    'paNORM',
                     'sf']
         dataID = pd.read_csv(os.path.abspath(args.id)).drop("Unnamed: 0",axis=1)
         dataID.columns = headersID
         plotAll(dataID,os.path.abspath(args.out),args.resolution.split(":"),args.coverage,args.gif)
+        plotNormalityOfSamples(dataID,os.path.abspath(args.out),args.resolution.split(":"))
