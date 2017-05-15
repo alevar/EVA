@@ -305,9 +305,8 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         ax.set_xticks(tickXCovBase)
         return line3,
 
-    unique=data["sf"].unique().tolist()
-    unique.sort()
-    for sf in unique[:-1]:
+    unique=np.sort(data["sf"].unique()).tolist()[:-1]
+    for sf in unique:
         print("Plotting: ",sf)
         dataTMP = data[data["sf"]==sf]
 
@@ -445,6 +444,12 @@ def main(args):
                     "cv_mean",
                     "cv_whiskLow",
                     "cv_whiskHigh",
+                    "cv2_q25",
+                    "cv2_median",
+                    "cv2_q75",
+                    "cv2_mean",
+                    "cv2_whiskLow",
+                    "cv2_whiskHigh",
                     "tauFull",
                     "tauTop10",
                     "tauTop20",
@@ -460,6 +465,7 @@ def main(args):
         plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"pa")
         plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"std")
         plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"cv")
+        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"cv2")
         plotTauSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
         if (len(dataSF["recall"].unique()) == 1) and np.isnan(dataSF["recall"].unique().tolist()[0]):
             dataSF.fillna(0,inplace=True)
@@ -482,6 +488,7 @@ def main(args):
                     'tpmQ50',
                     'tpmQ75',
                     'tpmCV',
+                    'tpmCV2',
                     'tpmIQR',
                     'tpmNORM',
                     'paMEAN',

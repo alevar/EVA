@@ -17,6 +17,7 @@ import seaborn as sbn
 from ast import literal_eval
 from sklearn import preprocessing
 from scipy.stats import boxcox
+from scipy.stats import shapiro
 from pandas.tools.plotting import scatter_matrix
 from matplotlib import animation
 from scipy.stats import t
@@ -81,6 +82,23 @@ def calcWhiskCV(row,data,param):
     wisklo = np.min(rDF[rDF["tpmCV"]>=lowWhisker]["tpmCV"])
     extremesHigh = rDF[rDF["tpmCV"]>wiskhi]["tpmCV"].tolist()
     extremesLow = rDF[rDF["tpmCV"]<wisklo]["tpmCV"].tolist()
+
+    del rDF
+    return [wisklo,wiskhi,extremesLow+extremesHigh]
+
+def calcWhiskCV2(row,data,param):
+    if row["sf"] == 1.0:
+        return [0,0,[0]]
+    iqr = row[param+"_q75"] - row[param+"_q25"]
+    lowWhisker = float(row[param+"_q25"])-1.5*float(iqr)
+    highWhisker = float(row[param+"_q75"])+1.5*float(iqr)
+
+    rDF = data[data["sf"] == row['sf']]
+
+    wiskhi = np.max(rDF[rDF["tpmCV2"]<=highWhisker]["tpmCV2"])
+    wisklo = np.min(rDF[rDF["tpmCV2"]>=lowWhisker]["tpmCV2"])
+    extremesHigh = rDF[rDF["tpmCV2"]>wiskhi]["tpmCV2"].tolist()
+    extremesLow = rDF[rDF["tpmCV2"]<wisklo]["tpmCV2"].tolist()
 
     del rDF
     return [wisklo,wiskhi,extremesLow+extremesHigh]
@@ -172,6 +190,12 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
     dataSF["cv_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].mean()).reset_index()["tpmCV"]
     dataSF[['cv_whiskLow','cv_whiskHigh','cv_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv"),axis=1)])
 
+    dataSF["cv2_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.25)).reset_index()["tpmCV2"]
+    dataSF["cv2_median"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.50)).reset_index()["tpmCV2"]
+    dataSF["cv2_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.75)).reset_index()["tpmCV2"]
+    dataSF["cv2_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].mean()).reset_index()["tpmCV2"]
+    dataSF[['cv2_whiskLow','cv2_whiskHigh','cv2_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv2"),axis=1)])
+
     data3["RankSampleID"] = data3["ID"]+":"+data3["sample"].astype(str)
 
     dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
@@ -210,6 +234,12 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
                 "cv_mean",
                 "cv_whiskLow",
                 "cv_whiskHigh",
+                "cv2_q25",
+                "cv2_median",
+                "cv2_q75",
+                "cv2_mean",
+                "cv2_whiskLow",
+                "cv2_whiskHigh",
                 "tauFull",
                 "tauTop10",
                 "tauTop20",
@@ -241,6 +271,18 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
                 "std_mean",
                 "std_whiskLow",
                 "std_whiskHigh",
+                "cv_q25",
+                "cv_median",
+                "cv_q75",
+                "cv_mean",
+                "cv_whiskLow",
+                "cv_whiskHigh",
+                "cv2_q25",
+                "cv2_median",
+                "cv2_q75",
+                "cv2_mean",
+                "cv2_whiskLow",
+                "cv2_whiskHigh",
                 "tauFull",
                 "tauTop10",
                 "tauTop20",
@@ -323,6 +365,12 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
     dataSF["cv_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].mean()).reset_index()["tpmCV"]
     dataSF[['cv_whiskLow','cv_whiskHigh','cv_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv"),axis=1)])
 
+    dataSF["cv2_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.25)).reset_index()["tpmCV2"]
+    dataSF["cv2_median"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.50)).reset_index()["tpmCV2"]
+    dataSF["cv2_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.75)).reset_index()["tpmCV2"]
+    dataSF["cv2_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].mean()).reset_index()["tpmCV2"]
+    dataSF[['cv2_whiskLow','cv2_whiskHigh','cv2_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv2"),axis=1)])
+
     data3["RankSampleID"] = data3["ID"]+":"+data3["sample"].astype(str)
 
     dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
@@ -361,6 +409,12 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
                 "cv_mean",
                 "cv_whiskLow",
                 "cv_whiskHigh",
+                "cv2_q25",
+                "cv2_median",
+                "cv2_q75",
+                "cv2_mean",
+                "cv2_whiskLow",
+                "cv2_whiskHigh",
                 "tauFull",
                 "tauTop10",
                 "tauTop20",
@@ -392,6 +446,18 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
                 "std_mean",
                 "std_whiskLow",
                 "std_whiskHigh",
+                "cv_q25",
+                "cv_median",
+                "cv_q75",
+                "cv_mean",
+                "cv_whiskLow",
+                "cv_whiskHigh",
+                "cv2_q25",
+                "cv2_median",
+                "cv2_q75",
+                "cv2_mean",
+                "cv2_whiskLow",
+                "cv2_whiskHigh",
                 "tauFull",
                 "tauTop10",
                 "tauTop20",
@@ -432,6 +498,7 @@ def readStatsID(dataPrime,outDir,gene=False):
         dfTPM[["ID","tpmQ75"]] = pd.DataFrame(df.groupby(by=["ID"])["tpmSF"].quantile(0.75)).reset_index()[["ID","tpmSF"]]
         dfG = pd.merge(dfG,dfTPM[["ID","tpmQ75"]],on=["ID"],how='left')
         dfG["tpmCV"] = dfG["tpmSTD"]/dfG["tpmMEAN"]*100
+        dfG["tpmCV2"] = dfG["tpmSTD"]/dfG["tpmBase"]*100
         dfG["tpmNORM"] = (3*(dfG["tpmMEAN"]-dfG["tpmQ50"]))/dfG["tpmSTD"]
         dfG.replace([np.inf, -np.inf], 0,inplace=True)
         dfG["tpmIQR"] = dfG["tpmQ75"]-dfG["tpmQ25"]
@@ -464,6 +531,7 @@ def readStatsID(dataPrime,outDir,gene=False):
                             'tpmQ50',
                             'tpmQ75',
                             'tpmCV',
+                            'tpmCV2',
                             'tpmIQR',
                             'tpmNORM',
                             'paMEAN',
