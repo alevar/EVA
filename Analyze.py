@@ -167,6 +167,8 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
     dataSF["pa_std"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].std()).reset_index()["paQ50"]
     dataSF["pa_cv"] = dataSF.apply(lambda row: (row["pa_std"]/row['pa_mean'])*100,axis=1)
 
+    dataSF["pa_extremes"] = [i for i in dataSF["pa_extremes"].tolist() if i>200]
+
     # dataSF["tpm_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.25)).reset_index()["tpmMEAN"]
     # dataSF["tpm_median"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.50)).reset_index()["tpmMEAN"]
     # dataSF["tpm_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.75)).reset_index()["tpmMEAN"]

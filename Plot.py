@@ -25,14 +25,14 @@ mpl.rcParams['agg.path.chunksize'] = 10000
 
 spotsOriginal = 92884447 # Mean number of spots in the selected alignments. eventually will be suplied by the program
 
-def plotBoxSF(data,outDir,res,param):
+def plotBoxSF(data,outDir,res,param,level,measure):
     # First we plotted the median and quartiles
     plt.close('all')
     plt.clf()
     fig = plt.figure(figsize=(int(res[0]),int(res[1])))
     ax1 = fig.add_axes((0.1,0.25,0.8,0.7))
-    ax1.set_title('Change in variation of transcript expression (%TPM) estimation as a function of the portion of aligned spots')
-    ax1.set_ylabel('Deviation of expression estimate from control (% TPM)')
+    ax1.set_title('Change in variation of '+level+' expression ('+measure+')')
+    ax1.set_ylabel('Deviation of expression estimate from control ('+measure+')')
     ax1.set_xlabel("Portion of aligned spots")
     ax1.plot(data["sf"], data[param+"_median"],'k',color='#CC4F1B')
     ax1.set_xlim(data["sf"].min(),data["sf"].max())
@@ -399,14 +399,25 @@ def plotAll(data,outDir,res,iqrCoefficient,gif):
         im_ani3 = animation.FuncAnimation(fig3, update_line3, len(unique),fargs=(list(reversed(unique)),), interval=600, blit=True)
         im_ani3.save(outDir+'/png/falseNegatives.gif',writer="imagemagick",dpi=50)
 
-def plotNormalityOfSamples(data,outDir,res):
+def plotNormalityOfSamples(data,outDir,res,level):
+    plt.close('all')
+    plt.clf()
+    plt.figure(figsize=(int(res[0]),int(res[1])))
+    plt.title('Distribution of skewness coefficient of random '+level+' samples')
+    plt.ylabel('Number of samples')
+    plt.xlabel('Skewness Coefficient')
     data = data.dropna()
     for sf in np.sort(data['sf'].unique().tolist())[:-1]:
         count, division = np.histogram(data[data["sf"]==sf]["tpmNORM"])
         mids=[(division[idx+1]+division[idx])/2 for idx in range(len(division)-1)]
         plt.scatter(mids,count,label=sf)
     plt.legend()
-    plt.savefig(outDir+"/png/"+str(sf)+"sampleNormality.png")
+    plt.savefig(outDir+"/png/sampleNormality.png")
+
+# this shall plot the number of transcripts/genes
+# for which expression levels (TPM) are estimated to be 2-fold or greater.
+def plotFold(data,outDir,res):
+    pass
 
 def main(args):
     if not os.path.exists(os.path.abspath(args.out)):
@@ -462,11 +473,11 @@ def main(args):
 
         dataSF = pd.read_csv(os.path.abspath(args.sf)).drop("Unnamed: 0",axis=1)
         dataSF.columns = headersSF
-        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"pa")
-        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"std")
-        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"cv")
-        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"cv2")
+        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"pa","gene","%TPM")
+        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"std","gene","Standard Deviation")
+        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"cv","gene","Coefficient of Variation")
         plotTauSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
+        plotFold(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
         if (len(dataSF["recall"].unique()) == 1) and np.isnan(dataSF["recall"].unique().tolist()[0]):
             dataSF.fillna(0,inplace=True)
             plotScattermatrixSFRange(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
@@ -503,4 +514,4 @@ def main(args):
         dataID = pd.read_csv(os.path.abspath(args.id)).drop("Unnamed: 0",axis=1)
         dataID.columns = headersID
         plotAll(dataID,os.path.abspath(args.out),args.resolution.split(":"),args.coverage,args.gif)
-        plotNormalityOfSamples(dataID,os.path.abspath(args.out),args.resolution.split(":"))
+        plotNormalityOfSamples(dataID,os.path.abspath(args.out),args.resolution.split(":"),"gene")
