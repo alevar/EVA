@@ -183,6 +183,10 @@ def eva(argv):
                                 '--id',
                                 type=str,
                                 help="plot data grouped by unique ID")
+    parser_plot.add_argument('-d',
+                                '--de',
+                                type=str,
+                                help="plot student t test results for diff expression/fold expression increase signifficance")
     parser_plot.add_argument('-g',
                                 '--gif',
                                 action="store_true",

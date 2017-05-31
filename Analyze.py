@@ -86,23 +86,6 @@ def calcWhiskCV(row,data,param):
     del rDF
     return [wisklo,wiskhi,extremesLow+extremesHigh]
 
-def calcWhiskCV2(row,data,param):
-    if row["sf"] == 1.0:
-        return [0,0,[0]]
-    iqr = row[param+"_q75"] - row[param+"_q25"]
-    lowWhisker = float(row[param+"_q25"])-1.5*float(iqr)
-    highWhisker = float(row[param+"_q75"])+1.5*float(iqr)
-
-    rDF = data[data["sf"] == row['sf']]
-
-    wiskhi = np.max(rDF[rDF["tpmCV2"]<=highWhisker]["tpmCV2"])
-    wisklo = np.min(rDF[rDF["tpmCV2"]>=lowWhisker]["tpmCV2"])
-    extremesHigh = rDF[rDF["tpmCV2"]>wiskhi]["tpmCV2"].tolist()
-    extremesLow = rDF[rDF["tpmCV2"]<wisklo]["tpmCV2"].tolist()
-
-    del rDF
-    return [wisklo,wiskhi,extremesLow+extremesHigh]
-
 def KendalTau(df,dfBASE,topF=1.0,orderTop=True):
     dfBASE = dfBASE.sort_values(by=["tpm","RankSampleID"],ascending=False)
     dfBASE = dfBASE.reset_index().drop("index",1)
@@ -162,12 +145,14 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
     dataSF["pa_mean"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].mean()).reset_index()["paQ50"]
     dataSF[['pa_whiskLow','pa_whiskHigh','pa_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk(row,data,"pa"),axis=1)])
     dataSF["pa_numExtremes"] = dataSF.apply(lambda row: len(row["pa_extremes"]),axis=1)
+    dataSF["pa_fold23"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>200)and(extreme<300)]),axis=1)
+    dataSF["pa_fold34"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>300)and(extreme<400)]),axis=1)
+    dataSF["pa_fold45"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>400)and(extreme<500)]),axis=1)
+    dataSF["pa_fold5"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if extreme>500]),axis=1)
     dataSF["pa_weightedNumExtremes"] = dataSF.apply(lambda row: 0 if row["sf"] == 1.0 else abs(np.array(row["pa_extremes"])-row["pa_median"]).mean()*row["pa_numExtremes"],axis=1)
     dataSF["pa_weightedNormalizedNumExtremes"] = dataSF.apply(lambda row: row["pa_weightedNumExtremes"]/row["NumTranscripts"],axis=1)
     dataSF["pa_std"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].std()).reset_index()["paQ50"]
     dataSF["pa_cv"] = dataSF.apply(lambda row: (row["pa_std"]/row['pa_mean'])*100,axis=1)
-
-    dataSF["pa_extremes"] = [i for i in dataSF["pa_extremes"].tolist() if i>200]
 
     # dataSF["tpm_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.25)).reset_index()["tpmMEAN"]
     # dataSF["tpm_median"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.50)).reset_index()["tpmMEAN"]
@@ -192,12 +177,6 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
     dataSF["cv_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].mean()).reset_index()["tpmCV"]
     dataSF[['cv_whiskLow','cv_whiskHigh','cv_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv"),axis=1)])
 
-    dataSF["cv2_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.25)).reset_index()["tpmCV2"]
-    dataSF["cv2_median"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.50)).reset_index()["tpmCV2"]
-    dataSF["cv2_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.75)).reset_index()["tpmCV2"]
-    dataSF["cv2_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].mean()).reset_index()["tpmCV2"]
-    dataSF[['cv2_whiskLow','cv2_whiskHigh','cv2_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv2"),axis=1)])
-
     data3["RankSampleID"] = data3["ID"]+":"+data3["sample"].astype(str)
 
     dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
@@ -208,8 +187,10 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
     dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
     dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
     print(" << Done Ranking and Tau coeeficient calculation")
+    numUnique = len(data["ID"].unique())
     if gene==True:
-        dataSF[["sf",
+        dataSF.columns = ['sf:'+str(numUnique)+':gene' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+str(numUnique)+":gene",
                 "falsePositives",
                 "falseNegatives",
                 "falseNegativesFull",
@@ -224,6 +205,10 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
                 "pa_weightedNormalizedNumExtremes",
                 "pa_std",
                 "pa_cv",
+                "pa_fold23",
+                "pa_fold34",
+                "pa_fold45",
+                "pa_fold5",
                 "std_q25",
                 "std_median",
                 "std_q75",
@@ -236,12 +221,6 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
                 "cv_mean",
                 "cv_whiskLow",
                 "cv_whiskHigh",
-                "cv2_q25",
-                "cv2_median",
-                "cv2_q75",
-                "cv2_mean",
-                "cv2_whiskLow",
-                "cv2_whiskHigh",
                 "tauFull",
                 "tauTop10",
                 "tauTop20",
@@ -252,7 +231,8 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
                 "recall",
                 "precision"]].to_csv(outDir+"/csv/groupedGeneBySF.csv")
     else:
-        dataSF[["sf",
+        dataSF.columns = ['sf:'+str(numUnique)+':transcript' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+str(numUnique)+":transcript",
                 "falsePositives",
                 "falseNegatives",
                 "falseNegativesFull",
@@ -267,6 +247,10 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
                 "pa_weightedNormalizedNumExtremes",
                 "pa_std",
                 "pa_cv",
+                "pa_fold23",
+                "pa_fold34",
+                "pa_fold45",
+                "pa_fold5",
                 "std_q25",
                 "std_median",
                 "std_q75",
@@ -279,12 +263,6 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
                 "cv_mean",
                 "cv_whiskLow",
                 "cv_whiskHigh",
-                "cv2_q25",
-                "cv2_median",
-                "cv2_q75",
-                "cv2_mean",
-                "cv2_whiskLow",
-                "cv2_whiskHigh",
                 "tauFull",
                 "tauTop10",
                 "tauTop20",
@@ -339,6 +317,10 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
     dataSF["pa_mean"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].mean()).reset_index()["paQ50"]
     dataSF[['pa_whiskLow','pa_whiskHigh','pa_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk(row,data,"pa"),axis=1)])
     dataSF["pa_numExtremes"] = dataSF.apply(lambda row: len(row["pa_extremes"]),axis=1)
+    dataSF["pa_fold23"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>200)and(extreme<300)]),axis=1)
+    dataSF["pa_fold34"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>300)and(extreme<400)]),axis=1)
+    dataSF["pa_fold45"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>400)and(extreme<500)]),axis=1)
+    dataSF["pa_fold5"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if extreme>500]),axis=1)
     dataSF["pa_weightedNumExtremes"] = dataSF.apply(lambda row: 0 if row["sf"] == 1.0 else abs(np.array(row["pa_extremes"])-row["pa_median"]).mean()*row["pa_numExtremes"],axis=1)
     dataSF["pa_weightedNormalizedNumExtremes"] = dataSF.apply(lambda row: row["pa_weightedNumExtremes"]/row["NumTranscripts"],axis=1)
     dataSF["pa_std"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].std()).reset_index()["paQ50"]
@@ -367,12 +349,6 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
     dataSF["cv_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].mean()).reset_index()["tpmCV"]
     dataSF[['cv_whiskLow','cv_whiskHigh','cv_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv"),axis=1)])
 
-    dataSF["cv2_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.25)).reset_index()["tpmCV2"]
-    dataSF["cv2_median"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.50)).reset_index()["tpmCV2"]
-    dataSF["cv2_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].quantile(0.75)).reset_index()["tpmCV2"]
-    dataSF["cv2_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV2"].mean()).reset_index()["tpmCV2"]
-    dataSF[['cv2_whiskLow','cv2_whiskHigh','cv2_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv2"),axis=1)])
-
     data3["RankSampleID"] = data3["ID"]+":"+data3["sample"].astype(str)
 
     dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
@@ -383,8 +359,10 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
     dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
     dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
     print(" << Done Ranking and Tau coeeficient calculation")
+    numUnique = len(data["ID"].unique())
     if gene==True:
-        dataSF[["sf",
+        dataSF.columns = ['sf:'+str(numUnique)+':gene' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+str(numUnique)+":gene",
                 "falsePositives",
                 "falseNegatives",
                 "falseNegativesFull",
@@ -399,6 +377,10 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
                 "pa_weightedNormalizedNumExtremes",
                 "pa_std",
                 "pa_cv",
+                "pa_fold23",
+                "pa_fold34",
+                "pa_fold45",
+                "pa_fold5",
                 "std_q25",
                 "std_median",
                 "std_q75",
@@ -411,12 +393,6 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
                 "cv_mean",
                 "cv_whiskLow",
                 "cv_whiskHigh",
-                "cv2_q25",
-                "cv2_median",
-                "cv2_q75",
-                "cv2_mean",
-                "cv2_whiskLow",
-                "cv2_whiskHigh",
                 "tauFull",
                 "tauTop10",
                 "tauTop20",
@@ -427,7 +403,8 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
                 "recall",
                 "precision"]].to_csv(outDir+"/csv/groupedGeneBySF.csv")
     else:
-        dataSF[["sf",
+        dataSF.columns = ['sf:'+str(numUnique)+':transcript' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+str(numUnique)+":transcript",
                 "falsePositives",
                 "falseNegatives",
                 "falseNegativesFull",
@@ -442,6 +419,10 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
                 "pa_weightedNormalizedNumExtremes",
                 "pa_std",
                 "pa_cv",
+                "pa_fold23",
+                "pa_fold34",
+                "pa_fold45",
+                "pa_fold5",
                 "std_q25",
                 "std_median",
                 "std_q75",
@@ -454,12 +435,6 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
                 "cv_mean",
                 "cv_whiskLow",
                 "cv_whiskHigh",
-                "cv2_q25",
-                "cv2_median",
-                "cv2_q75",
-                "cv2_mean",
-                "cv2_whiskLow",
-                "cv2_whiskHigh",
                 "tauFull",
                 "tauTop10",
                 "tauTop20",
@@ -500,7 +475,6 @@ def readStatsID(dataPrime,outDir,gene=False):
         dfTPM[["ID","tpmQ75"]] = pd.DataFrame(df.groupby(by=["ID"])["tpmSF"].quantile(0.75)).reset_index()[["ID","tpmSF"]]
         dfG = pd.merge(dfG,dfTPM[["ID","tpmQ75"]],on=["ID"],how='left')
         dfG["tpmCV"] = dfG["tpmSTD"]/dfG["tpmMEAN"]*100
-        dfG["tpmCV2"] = dfG["tpmSTD"]/dfG["tpmBase"]*100
         dfG["tpmNORM"] = (3*(dfG["tpmMEAN"]-dfG["tpmQ50"]))/dfG["tpmSTD"]
         dfG.replace([np.inf, -np.inf], 0,inplace=True)
         dfG["tpmIQR"] = dfG["tpmQ75"]-dfG["tpmQ25"]
@@ -523,7 +497,8 @@ def readStatsID(dataPrime,outDir,gene=False):
         dfG.replace("inf",0,inplace=True)
         dfG.replace(np.nan,0,inplace=True)
         dfG["sf"]=sf
-        frames.append(dfG[['ID',
+        if gene:
+            frames.append(dfG[['ID',
                             'covBase',
                             'tpmBase',
                             'falseNegative',
@@ -533,7 +508,28 @@ def readStatsID(dataPrime,outDir,gene=False):
                             'tpmQ50',
                             'tpmQ75',
                             'tpmCV',
-                            'tpmCV2',
+                            'tpmIQR',
+                            'tpmNORM',
+                            'paMEAN',
+                            'paSTD',
+                            'paQ25',
+                            'paQ50',
+                            'paQ75',
+                            'paCV',
+                            'paIQR',
+                            'paNORM',
+                            'sf']])
+        else:
+            frames.append(dfG[['ID',
+                            'covBase',
+                            'tpmBase',
+                            'falseNegative',
+                            'tpmMEAN',
+                            'tpmSTD',
+                            'tpmQ25',
+                            'tpmQ50',
+                            'tpmQ75',
+                            'tpmCV',
                             'tpmIQR',
                             'tpmNORM',
                             'paMEAN',
@@ -548,10 +544,16 @@ def readStatsID(dataPrime,outDir,gene=False):
     data=pd.concat(frames)
     data=data.reset_index(drop=True)
     if gene==True:
+        data.columns = ['ID:gene' if x=='ID' else x for x in list(data)]
         data.to_csv(outDir+"/csv/groupedGeneByID.csv")
     else:
+        data.columns = ['ID:transcript' if x=='ID' else x for x in list(data)]
         data.to_csv(outDir+"/csv/groupedTranscriptByID.csv")
 
+    if gene:
+        data.columns = ['ID' if x=='ID:gene' else x for x in list(data)]
+    else:
+        data.columns = ['ID' if x=='ID:transcript' else x for x in list(data)]
     return data
 
 def readStatsStudentTest(data,outDir,gene=False):
@@ -594,8 +596,10 @@ def readStatsStudentTest(data,outDir,gene=False):
     df.reset_index(inplace=True)
     df.drop("index",axis=1,inplace=True)
     if gene==True:
+        df.columns = ['ID:gene' if x=='ID' else x for x in list(df)]
         df.to_csv(outDir+"/csv/groupedGeneByIDStudent.csv")
     else:
+        df.columns = ['ID:transcript' if x=='ID' else x for x in list(df)]
         df.to_csv(outDir+"/csv/groupedTranscriptByIDStudent.csv")
     del df
 

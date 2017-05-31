@@ -25,14 +25,14 @@ mpl.rcParams['agg.path.chunksize'] = 10000
 
 spotsOriginal = 92884447 # Mean number of spots in the selected alignments. eventually will be suplied by the program
 
-def plotBoxSF(data,outDir,res,param,level,measure):
+def plotBoxSF(data,outDir,res,param,level,measure,numUnique):
     # First we plotted the median and quartiles
     plt.close('all')
     plt.clf()
     fig = plt.figure(figsize=(int(res[0]),int(res[1])))
     ax1 = fig.add_axes((0.1,0.25,0.8,0.7))
-    ax1.set_title('Change in variation of '+level+' expression ('+measure+')')
-    ax1.set_ylabel('Deviation of expression estimate from control ('+measure+')')
+    ax1.set_title('Change in variation of '+level+' expression ('+measure+')\nTotal number of '+level+'s is '+str(numUnique))
+    ax1.set_ylabel('Deviation of '+level+' expression estimate from control ('+measure+')')
     ax1.set_xlabel("Portion of aligned spots")
     ax1.plot(data["sf"], data[param+"_median"],'k',color='#CC4F1B')
     ax1.set_xlim(data["sf"].min(),data["sf"].max())
@@ -46,23 +46,23 @@ def plotBoxSF(data,outDir,res,param,level,measure):
     ax2.set_xlim(data["sf"].min(),data["sf"].max())
     ax2.yaxis.set_visible(False)
     ax2.set_xticks(data["sf"])
-    ax2.set_xlabel("# aligned spots")
+    ax2.set_xlabel("# aligned spots in full assembly")
     ticks2F = [str('%.2f' %((elem*spotsOriginal)/1000000))+"M" for elem in data["sf"].tolist()]
     ax2.set_xticklabels(ticks2F)
 
-    caption = "Figure. Plot shows the change in variation of estimated transcript expression levels (%TPM) as a function of the number of aligned reads used in the assembly. The plot shows the median and four quartiles of the distribution of estimated expression levels (%TPM) for each downsampling."
+    caption = "Figure. Plot shows the change in variation of estimated transcript expression levels ("+measure+") as a function of the number of aligned reads used in the assembly. The plot shows the median and four quartiles of the distribution of estimated expression levels ("+measure+") for each downsampling."
     # plt.figtext(.05, .05, caption,wrap=True,fontsize=18)
     plt.savefig(outDir+"/png/boxSF"+param+".png")
     plt.close('all')
     plt.clf()
 
-def plotTauSF(data,outDir,res):
+def plotTauSF(data,outDir,res,level,numUnique):
     # Next we plotted all kendal tau coefficients
     plt.close('all')
     plt.clf()
     fig = plt.figure(figsize=(int(res[0]),int(res[1])))
     ax1 = fig.add_axes((0.1,0.25,0.8,0.7))
-    title = "Portion of aligned spots versus Kendall's Tau ranking of transcripts by expression levels"
+    title = "Portion of aligned spots versus Kendall's Tau ranking of transcripts by expression levels\nTotal number of "+level+"s is "+str(numUnique)
     ax1.set_title(title)
     ax1.set_ylabel("Kendall's Tau ranking correlation coefficient")
     ax1.set_xlabel("Portion of aligned spots")
@@ -76,7 +76,7 @@ def plotTauSF(data,outDir,res):
     ax2.set_xlim(data["sf"].min(),data["sf"].max())
     ax2.yaxis.set_visible(False)
     ax2.set_xticks(data["sf"])
-    ax2.set_xlabel("# aligned spots")
+    ax2.set_xlabel("# aligned spots in full assembly")
     ticks2F = [str('%.2f' %((elem*spotsOriginal)/1000000))+"M" for elem in data["sf"].tolist()]
     ax2.set_xticklabels(ticks2F)
 
@@ -101,7 +101,7 @@ def plotScattermatrixSFRange(data,outDir,res):
     # plt.figtext(.05, .05, caption,wrap=True,fontsize=18)
     plt.savefig(outDir+"/png/scatterMatrixSF.png")
 
-def plotPCAFull(data,outDir,res):
+def plotPCAFull(data,outDir,res,level,numUnique):
     plt.close("all")
     plt.clf()
     Y = data["sf"]
@@ -116,7 +116,7 @@ def plotPCAFull(data,outDir,res):
     labels = ["falsePositives","falseNegatives","falseNegativesFull","pa_median","pa_weightedNormalizedNumExtremes","pa_std","tauFull"]
     fig = plt.figure(figsize=(int(res[0]),int(res[1])))
     ax1 = fig.add_axes((0.1,0.1,0.8,0.85))
-    ax1.set_title("PCA1 versus PCA2")
+    ax1.set_title("PCA1 versus PCA2\nTotal number of "+level+"s is "+str(numUnique))
     ax1.set_ylabel("PCA2")
     ax1.set_xlabel("PCA1")
     ax1.scatter(xs,ys)
@@ -133,7 +133,7 @@ def plotPCAFull(data,outDir,res):
 
     plt.savefig(outDir+"/png/pcaSF.png")
 
-def plotPCARange(data,outDir,res):
+def plotPCARange(data,outDir,res,level,numUnique):
     plt.close("all")
     plt.clf()
     Y = data["sf"]
@@ -148,7 +148,7 @@ def plotPCARange(data,outDir,res):
     labels = ["falseNegatives","falseNegativesFull","pa_median","pa_weightedNormalizedNumExtremes","pa_std","tauFull"]
     fig = plt.figure(figsize=(int(res[0]),int(res[1])))
     ax1 = fig.add_axes((0.1,0.1,0.8,0.85))
-    ax1.set_title("PCA1 versus PCA2")
+    ax1.set_title("PCA1 versus PCA2\nTotal number of "+level+"s is "+str(numUnique))
     ax1.set_ylabel("PCA2")
     ax1.set_xlabel("PCA1")
     ax1.scatter(xs,ys)
@@ -165,14 +165,14 @@ def plotPCARange(data,outDir,res):
 
     plt.savefig(outDir+"/png/pcaSF.png")
 
-def plotPrecision(data,outDir,res):
+def plotPrecision(data,outDir,res,level,numUnique):
     plt.close('all')
     plt.clf()
     fig = plt.figure(figsize=(int(res[0]),int(res[1])))
     ax1 = fig.add_axes((0.1,0.25,0.8,0.7))
-    title = "Precision of Assembly"
+    title = "Recall of Assembly\nTotal number of "+level+"s is "+str(numUnique)
     ax1.set_title(title)
-    ax1.set_ylabel("Precision")
+    ax1.set_ylabel("Recall")
     ax1.set_xlabel("Portion of aligned spots")
     ax1.scatter(data["sf"], data["precision"])
     ax1.set_xlim(data["sf"].min(),data["sf"].max())
@@ -182,20 +182,20 @@ def plotPrecision(data,outDir,res):
     ax2.set_xlim(data["sf"].min(),data["sf"].max())
     ax2.yaxis.set_visible(False)
     ax2.set_xticks(data["sf"])
-    ax2.set_xlabel("# aligned spots")
+    ax2.set_xlabel("# aligned spots in full assembly")
     ticks2F = [str('%.2f' %((elem*spotsOriginal)/1000000))+"M" for elem in data["sf"].tolist()]
     ax2.set_xticklabels(ticks2F)
 
-    plt.savefig(outDir+"/png/precision.png")
+    plt.savefig(outDir+"/png/recall.png")
 
-def plotPrecision_VS_Recall(data,outDir,res):
+def plotPrecision_VS_Recall(data,outDir,res,level,numUnique):
     plt.close("all")
     plt.clf()
     plt.figure(figsize=(int(res[0]),int(res[1])))
     plt.title("Recall vs Precision")
     fig, ax = plt.subplots()
     ax.scatter(data["recall"], data["precision"])
-    ax.set_title("Recall versus Precision")
+    ax.set_title("Recall versus Precision\nTotal number of "+level+"s is "+str(numUnique))
     ax.set_xlabel("Recall")
     ax.set_ylabel('Precision')
     minXTick = data["recall"].min()-0.0001*(data["recall"].min())
@@ -414,10 +414,32 @@ def plotNormalityOfSamples(data,outDir,res,level):
     plt.legend()
     plt.savefig(outDir+"/png/sampleNormality.png")
 
-# this shall plot the number of transcripts/genes
-# for which expression levels (TPM) are estimated to be 2-fold or greater.
-def plotFold(data,outDir,res):
-    pass
+# This function plots the number of genes/transcripts what have >2 fold change in expression levels from the base value
+def plotFold(data,outDir,res,level,numUnique):
+    plt.close("all")
+    plt.clf()
+    plt.figure(figsize=(int(res[0]),int(res[1])))
+    plt.title('Samples with large fold change (x>2)\nTotal number of '+level+'s is '+str(numUnique))
+    plt.ylabel('Number of samples')
+    plt.xlabel('Portion of aligned spots')
+    plt.scatter(data["sf"].tolist(),data["pa_fold23"].tolist(),label="2<x<3")
+    plt.scatter(data["sf"].tolist(),data["pa_fold34"].tolist(),label="3<x<4")
+    plt.scatter(data["sf"].tolist(),data["pa_fold45"].tolist(),label="4<x<5")
+    plt.scatter(data["sf"].tolist(),data["pa_fold5"].tolist(),label="5<x")
+    plt.legend()
+    plt.savefig(outDir+"/png/foldIncrease.png")
+
+def plotStudentTest(data,outDir,res):
+    plt.close("all")
+    plt.clf()
+    plt.figure(figsize=(int(res[0]),int(res[1])))
+    plt.title('Minimum statistically significant fold change')
+    plt.ylabel('Fold change')
+    plt.xlabel('Expression estimate (TPM) at full coverage')
+    for sf in np.sort(data['sf'].unique().tolist())[:-1]:
+        plt.scatter(data[data["sf"]==sf]["tpmBase"],data[data["sf"]==sf]["fold"],label=sf)
+    plt.legend()
+    plt.savefig(outDir+"/png/studentTest.png")
 
 def main(args):
     if not os.path.exists(os.path.abspath(args.out)):
@@ -443,6 +465,10 @@ def main(args):
                     "pa_weightedNormalizedNumExtremes",
                     "pa_std",
                     "pa_cv",
+                    "pa_fold23",
+                    "pa_fold34",
+                    "pa_fold45",
+                    "pa_fold5",
                     "std_q25",
                     "std_median",
                     "std_q75",
@@ -455,12 +481,6 @@ def main(args):
                     "cv_mean",
                     "cv_whiskLow",
                     "cv_whiskHigh",
-                    "cv2_q25",
-                    "cv2_median",
-                    "cv2_q75",
-                    "cv2_mean",
-                    "cv2_whiskLow",
-                    "cv2_whiskHigh",
                     "tauFull",
                     "tauTop10",
                     "tauTop20",
@@ -472,21 +492,25 @@ def main(args):
                     "precision"]
 
         dataSF = pd.read_csv(os.path.abspath(args.sf)).drop("Unnamed: 0",axis=1)
+        level = list(dataSF)[0].split(":")[-1]
+        numUnique = list(dataSF)[0].split(":")[-2]
         dataSF.columns = headersSF
-        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"pa","gene","%TPM")
-        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"std","gene","Standard Deviation")
-        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"cv","gene","Coefficient of Variation")
-        plotTauSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
-        plotFold(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
+        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"pa",level,"%TPM",numUnique)
+        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"std",level,"Standard Deviation",numUnique)
+        plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"cv",level,"Coefficient of Variation",numUnique)
+        plotTauSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
+        plotFold(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
         if (len(dataSF["recall"].unique()) == 1) and np.isnan(dataSF["recall"].unique().tolist()[0]):
             dataSF.fillna(0,inplace=True)
             plotScattermatrixSFRange(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
-            plotPCARange(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
-            plotPrecision(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
+            plotPCARange(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
+            plotPrecision(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
         else:
             plotScattermatrixSFFull(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
-            plotPCAFull(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
-            plotPrecision_VS_Recall(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
+            plotPCAFull(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
+            plotPrecision_VS_Recall(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
+
+        del dataSF
 
     if not args.id == None:
         headersID = ['ID',
@@ -499,7 +523,6 @@ def main(args):
                     'tpmQ50',
                     'tpmQ75',
                     'tpmCV',
-                    'tpmCV2',
                     'tpmIQR',
                     'tpmNORM',
                     'paMEAN',
@@ -512,6 +535,30 @@ def main(args):
                     'paNORM',
                     'sf']
         dataID = pd.read_csv(os.path.abspath(args.id)).drop("Unnamed: 0",axis=1)
+        level = list(dataID)[0].split(":")[-1]
         dataID.columns = headersID
         plotAll(dataID,os.path.abspath(args.out),args.resolution.split(":"),args.coverage,args.gif)
-        plotNormalityOfSamples(dataID,os.path.abspath(args.out),args.resolution.split(":"),"gene")
+        plotNormalityOfSamples(dataID,os.path.abspath(args.out),args.resolution.split(":"),level)
+
+        del dataID
+
+    if not args.de == None:
+        headersDE = ["ID",
+                    "sf",
+                    "tpmMean",
+                    "covBase",
+                    "tpmBase",
+                    "std",
+                    "n",
+                    "df",
+                    "isf",
+                    "denominator",
+                    "score",
+                    "scoreRev",
+                    "fold"]
+
+        dataDE = pd.read_csv(os.path.abspath(args.de)).drop("Unnamed: 0",axis=1)
+        dataDE.columns = headersDE
+        plotStudentTest(dataDE,os.path.abspath(args.out),args.resolution.split(":"))
+
+        del dataDE
