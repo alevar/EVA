@@ -3,7 +3,7 @@
 # Sample Animated plot showing how the number of spots in the alignment affects the accuracy of expression estimation
 ![](https://github.com/alevar/EVA/blob/master/figures/analysisFull/gene/png/boxID.gif)
 # A general plot showing the median and 2nd/3rd quartile groups
-![](https://github.com/alevar/EVA/blob/master/figures/analysisFull/gene/png/boxSF.png)
+![](https://github.com/alevar/EVA/blob/master/figures/analysisFull/gene/png/boxSFpa.png)
 # A scatter matrix showing relationships between different statistical features
 ![](https://github.com/alevar/EVA/blob/master/figures/analysisFull/gene/png/scatterMatrixSF.png)
 # Comparrison of rankings of transcripts by expression levels
