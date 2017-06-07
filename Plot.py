@@ -31,8 +31,8 @@ def plotBoxSF(data,outDir,res,param,level,measure,numUnique):
     plt.clf()
     fig = plt.figure(figsize=(int(res[0]),int(res[1])))
     ax1 = fig.add_axes((0.1,0.25,0.8,0.7))
-    ax1.set_title('Change in variation of '+level+' expression ('+measure+')\nTotal number of '+level+'s is '+str(numUnique))
-    ax1.set_ylabel('Deviation of '+level+' expression estimate from control ('+measure+')')
+    ax1.set_title('Change in variation of'+level+' expression ('+measure+') based on a '+level+'-level assembly of '+str(numUnique)+' '+level+'s')
+    ax1.set_ylabel('Deviation of '+level+' expression estimate from full assembly ('+measure+')')
     ax1.set_xlabel("Portion of aligned spots")
     ax1.plot(data["sf"], data[param+"_median"],'k',color='#CC4F1B')
     ax1.set_xlim(data["sf"].min(),data["sf"].max())
@@ -210,6 +210,82 @@ def plotPrecision_VS_Recall(data,outDir,res,level,numUnique):
         ax.annotate(str(txt)+" ("+ticks2F[i]+")", (data["recall"].tolist()[i],data["precision"].tolist()[i]))
 
     plt.savefig(outDir+"/png/recallPrecision.png")
+
+#===========================================================
+#===========================================================
+#===========================================================
+#===========================================================
+
+def plotPubSF(data,outDir,res,param,level,measure,numUnique):
+    #########################################################
+    #########################################################
+    plt.close('all')
+    plt.clf()
+    fig = plt.figure(figsize=(int(res[0]),int(res[1])))
+    ax1 = fig.add_axes((0.11,0.11,0.85,0.79))
+    ax1.set_title('Change in variation of'+level+' expression ('+measure+') based on a '+level+'-level assembly of '+str(numUnique)+' '+level+'s')
+    ax1.set_ylabel('Variation in '+level+'-level expression estimation ('+measure+')')
+    ax1.plot(data["sf"], data[param+"_median"],'k',color='#CC4F1B')
+    ax1.set_xlim(data["sf"].min(),data["sf"].max())
+    ticks2F = [str('%.2f' %((elem*spotsOriginal)/1000000))+"M" for elem in data["sf"].tolist()]
+    ax1.set_xticklabels(ticks2F)
+    ax1.set_xlabel("Number of aligned paired-end reads")
+    ax1.fill_between(data["sf"], data[param+"_q25"], data[param+"_q75"],
+        alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
+    ax1.fill_between(data["sf"], data[param+"_whiskLow"], data[param+"_whiskHigh"],
+        alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
+
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+
+    caption = "Figure. Plot shows the change in variation of estimated transcript expression levels ("+measure+") as a function of the number of aligned reads used in the assembly. The plot shows the median and four quartiles of the distribution of estimated expression levels ("+measure+") for each downsampling."
+    plt.savefig(outDir+"/png/pubVARIATION.png")
+    plt.close('all')
+    plt.clf()
+
+    #########################################################
+    #########################################################
+
+    plt.close('all')
+    plt.clf()
+    fig = plt.figure(figsize=(int(res[0]),int(res[1])))
+    host = fig.add_axes((0.11,0.11,0.79,0.79))
+
+    # host = host_subplot(111, axes_class=AA.Axes)
+    plt.subplots_adjust(right=0.9)
+
+    par1 = host.twinx()
+    host.yaxis.grid(False)
+    par1.yaxis.grid(False)
+    host.grid(False)
+    par1.grid(False)
+
+    host.set_xlim(data["sf"].min(),data["sf"].max())
+
+    host.set_xlabel("Number of aligned paired-end reads")
+    ticks2F = [str('%.2f' %((elem*spotsOriginal)/1000000))+"M" for elem in data["sf"].tolist()]
+    host.set_xticklabels(ticks2F)
+    host.set_title('Recall & Fold Change of '+level+'-level assembly of '+str(numUnique)+' '+level+'s')
+    par1.set_ylabel('Fraction of expressed '+level+'s compared to full assembly (Recall)')
+    host.set_ylabel("# "+level+"s with TPM fold change > 2 compared to full assembly")
+
+    p1, = par1.plot(data["sf"], data["recall"], label="Recall",c=sbn.color_palette("muted")[0])
+    p2, = host.plot(data["sf"].tolist(),data["pa_fold23"]+data["pa_fold34"]+data["pa_fold45"]+data["pa_fold5"], label="Fold",c=sbn.color_palette("muted")[1])
+
+    host.spines['top'].set_visible(False)
+    par1.spines['top'].set_visible(False)
+    par1.spines['right'].set_color(p1.get_color())
+    par1.spines['left'].set_color(p2.get_color())
+    host.xaxis.set_ticks_position('bottom')
+    host.yaxis.set_ticks_position('left')
+    par1.xaxis.set_ticks_position('bottom')
+    par1.yaxis.set_ticks_position('right')
+    par1.yaxis.label.set_color(p1.get_color())
+    par1.tick_params(axis='y', colors=p1.get_color())
+    host.yaxis.label.set_color(p2.get_color())
+    host.tick_params(axis='y', colors=p2.get_color())
+
+    plt.savefig(outDir+"/png/pubFOLD_RECALL.png")
 
 def plotAll(data,outDir,res,iqrCoefficient,gif):
     try:
@@ -510,6 +586,7 @@ def main(args):
             plotPCAFull(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
             plotPrecision_VS_Recall(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
 
+        plotPubSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"pa",level,"%TPM",numUnique)
         del dataSF
 
     if not args.id == None:
