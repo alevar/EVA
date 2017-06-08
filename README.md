@@ -24,20 +24,20 @@ As an example EVA was run on the full GTEX dataset in order to infer precision a
 		- the mean of 68M reads was too low as compared to many other samples in the original dataset which were distributed a little further from their means when binned
 	- We ran the same command with custom ranges ("eva select -i <path to the gtex data alignments made with hisat2> -n 20 -r minbound:maxbound") to establish the best bin for the task.
 		- 12 alignments were selected for the analysis to maximize the number of aligned paired-end reads but also to maintain a relatively small normal distribution of the number of reads. Some information about selected alignments is provided in the table below. 
-| tissue,indiv,nPairs,percentAlign,pairsAlign        | 
-|----------------------------------------------------| 
-| Adipose_Tissue,SRR1347459,101744077,90.69,92271703 | 
-| Blood_Vessel,SRR1480384,99127400,93.74,92922024    | 
-| Brain,SRR1340700,100677272,94.53,95170225          | 
-| Brain,SRR1413454,104437357,91.51,95570625          | 
-| Brain,SRR818418,108213279,88.82,96115034           | 
-| Brain,SRR820623,101951408,89.05,90787728           | 
-| Heart,SRR1338171,98987868,95.2,94236450            | 
-| Lung,SRR657659,111128812,84.6,94014974             | 
-| Muscle,SRR598452,110116503,84.49,93037433          | 
-| Muscle,SRR659507,102065575,88.21,90032043          | 
-| Skin,SRR1379303,98920289,91.23,90244979            | 
-| Thyroid,SRR656035,101280055,89.07,90210144         | 
+| Tissue 		|Individual |#Spots 	|%Aligned Spots	|#Aligned Spots | 
+|---------------|-----------|-----------|---------------|---------------| 
+| Adipose_Tissue|SRR1347459	|101744077	|90.69			|92271703  		| 
+| Blood_Vessel	|SRR1480384	|99127400	|93.74			|92922024  		| 
+| Brain			|SRR1340700	|100677272	|94.53			|95170225  		| 
+| Brain			|SRR1413454	|104437357	|91.51			|95570625  		| 
+| Brain			|SRR818418	|108213279	|88.82			|96115034  		| 
+| Brain			|SRR820623	|101951408	|89.05			|90787728  		| 
+| Heart			|SRR1338171	|98987868	|95.2			|94236450  		| 
+| Lung			|SRR657659	|111128812	|84.6			|94014974  		| 
+| Muscle		|SRR598452	|110116503	|84.49			|93037433  		| 
+| Muscle		|SRR659507	|102065575	|88.21			|90032043  		| 
+| Skin			|SRR1379303	|98920289	|91.23			|90244979  		| 
+| Thyroid		|SRR656035	|101280055	|89.07			|90210144  		| 
 
 2. "eva assemble -i <paths to the samples as outputed by eva select> -r 0.1:1.0:0.1 -o ./test -a <path to the annotation> -e <path to the reference> -w 10 -f 12 -t 2 -o <path to the output directory> -l"
 	- eva assemble uses samtools, hisat and stringtie to assemble input reads and estimate expression levels. Stringtie is run with the "-e" flag which tells stringtie to "only estimate the abundance of given reference transcripts"
