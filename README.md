@@ -16,14 +16,15 @@ As an example EVA was run on the full GTEX dataset in order to infer precision a
 
 # Workflow:
 1. "eva select -i <path to the gtex data alignments made with hisat2> -n 20 -r auto"
-	- this command parses through the alignment logs and builds information about each tissue and individual sample in the dataset and the total number of reads and percent of reads aligned.
-	- the constructed dataset is saved locally as the output of the command
-	- the auto range parameter binned the data and outputed the bin with the greatest mean number of aligned reads and saved this subset of the original dataset locally as well as a box plot for the number of aligned reads
-	- after close inspection of both dataframes we came to the following conclusion:
-		- samples suggested by the auto range parameter had very low standard deviation
-		- the mean of 68M reads was too low as compared to many other samples in the original dataset which were distributed a little further from their means when binned
-	- We ran the same command with custom ranges ("eva select -i <path to the gtex data alignments made with hisat2> -n 20 -r minbound:maxbound") to establish the best bin for the task.
-		- 12 alignments were selected for the analysis to maximize the number of aligned paired-end reads but also to maintain a relatively small normal distribution of the number of reads. Some information about selected alignments is provided in the table below. 
+- this command parses through the alignment logs and builds information about each tissue and individual sample in the dataset and the total number of reads and percent of reads aligned.
+- the constructed dataset is saved locally as the output of the command
+- the auto range parameter binned the data and outputed the bin with the greatest mean number of aligned reads and saved this subset of the original dataset locally as well as a box plot for the number of aligned reads
+- after close inspection of both dataframes we came to the following conclusion:
+	- samples suggested by the auto range parameter had very low standard deviation
+	- the mean of 68M reads was too low as compared to many other samples in the original dataset which were distributed a little further from their means when binned
+- We ran the same command with custom ranges ("eva select -i <path to the gtex data alignments made with hisat2> -n 20 -r minbound:maxbound") to establish the best bin for the task.
+	- 12 alignments were selected for the analysis to maximize the number of aligned paired-end reads but also to maintain a relatively small normal distribution of the number of reads. Some information about selected alignments is provided in the table below. 
+		
 | Tissue 		|Individual |#Spots 	|%Aligned Spots	|#Aligned Spots | 
 |---------------|-----------|-----------|---------------|---------------| 
 | Adipose_Tissue|SRR1347459	|101744077	|90.69			|92271703  		| 
