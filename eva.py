@@ -149,6 +149,10 @@ def eva(argv):
                                 required=False,
                                 type=str,
                                 help="provide gene-lvel assembly results for analysis")
+    parser_analyze.add_argument('-f',
+                                '--fast',
+                                action="store_true",
+                                help="speed up the grouping and statistical analysis by using grouped by ID as input to sf")
     parser_analyze.set_defaults(func=Analyze.main)
 
 #===========================================

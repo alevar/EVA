@@ -52,6 +52,23 @@ def calcWhisk(row,data,param):
     del rDF
     return [wisklo,wiskhi,extremesLow+extremesHigh]
 
+def calcWhisk_slow(row,data,param):
+    if row["sf"] == 1.0:
+        return [100,100,[]]
+    iqr = row[param+"_q75"] - row[param+"_q25"]
+    lowWhisker = float(row[param+"_q25"])-1.5*float(iqr)
+    highWhisker = float(row[param+"_q75"])+1.5*float(iqr)
+
+    rDF = data[data["sf"] == row['sf']]
+
+    wiskhi = np.max(rDF[rDF[param]<=highWhisker][param])
+    wisklo = np.min(rDF[rDF[param]>=lowWhisker][param])
+    extremesHigh = rDF[rDF[param]>wiskhi][param].tolist()
+    extremesLow = rDF[rDF[param]<wisklo][param].tolist()
+
+    del rDF
+    return [wisklo,wiskhi,extremesLow+extremesHigh]
+
 def calcWhiskSTD(row,data,param):
     if row["sf"] == 1.0:
         return [0,0,[0]]
@@ -112,85 +129,73 @@ def KendalTau(df,dfBASE,topF=1.0,orderTop=True):
     del uniqueCOMBINATION
     return tau["rank"]["1.0"]
 
-def readStatsSFRange(data1,data2,outDir,gene=False):
-    data=data2
-    data3=data1
-    cols = ['ID','covBase','tpmBase','falseNegative','tpmMEAN','paMEAN','sf']
-
-    dataOff = pd.unique(data3[(data3["sf"] == 1.0) & (data3["tpm"] == 0.0)]["ID"])
-    uniqueID1Maintain = pd.unique(data3[~data3["ID"].isin(dataOff)]["ID"])
+def readStatsSFRange_slow(data,dataID,outDir,gene=False):
+    dataOff = pd.unique(data[(data["sf"] == 1.0) & (data["tpm"] == 0.0)]["ID"])
+    uniqueID1Maintain = pd.unique(data[~data["ID"].isin(dataOff)]["ID"])
     del dataOff
-    dataN = data3[~data3["ID"].isin(uniqueID1Maintain)]
-    data3 = data3[data3["ID"].isin(uniqueID1Maintain)]
-    data3["lost"] = data3.apply(lambda row: row["tpm"] == 0.0,axis=1)
+    dataN = data[~data["ID"].isin(uniqueID1Maintain)]
+    data = data[data["ID"].isin(uniqueID1Maintain)]
+    data["lost"] = data.apply(lambda row: row["tpm"] == 0.0,axis=1)
 
     setTrueNeg = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]==0.0)]["ID"].unique()) # Lets try counting the number of false Positives
     setTruePos = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]!=0.0)]["ID"].unique()) # Lets try counting the number of false Positives
     setFalsePos = list(setTrueNeg.difference(setTruePos)) # Lets try counting the number of falsePositives
 
-    dataSF = pd.DataFrame(data[cols].groupby(['sf']).mean()).reset_index()
+    dataSF = pd.DataFrame(data.groupby(['sf']).mean()).reset_index()
     dataSF["falsePositives"] = np.nan
     dataSF["recall"] = np.nan
 
-    dataSF["falseNegatives"] = dataSF.apply(lambda row: len(data3[(data3["sf"] == row["sf"])&(data3["lost"])]),axis=1)
-    dataLostAll = pd.DataFrame(data3.groupby(["ID","sf"]).mean()).reset_index()
+    dataSF["falseNegatives"] = dataSF.apply(lambda row: len(data[(data["sf"] == row["sf"])&(data["lost"])]),axis=1)
+    dataLostAll = pd.DataFrame(data.groupby(["ID","sf"]).mean()).reset_index()
     dataSF["falseNegativesFull"] = dataSF.apply(lambda row: len(dataLostAll[(dataLostAll["sf"] == row["sf"])&(dataLostAll["lost"] == 1.0)]),axis=1)
-    dataSF["NumTranscripts"] = pd.DataFrame(data3.groupby(["sf"],as_index=False)["tpm"].count())["tpm"]
+    dataSF["NumTranscripts"] = pd.DataFrame(data.groupby(["sf"],as_index=False)["tpm"].count())["tpm"]
     dataSF["precision"] = (dataSF["NumTranscripts"]-dataSF["falseNegatives"])/dataSF["NumTranscripts"]
-    dictBase = pd.Series(data3[data3["sf"]==1.0].tpm.values,index=data3[data3["sf"]==1.0].ID).to_dict()
+    dictBase = pd.Series(data[data["sf"]==1.0].tpm.values,index=data[data["sf"]==1.0].ID).to_dict()
 
-    dataSF["pa_q25"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.25)).reset_index()["paQ50"]
-    dataSF["pa_median"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.50)).reset_index()["paQ50"]
-    dataSF["pa_q75"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.75)).reset_index()["paQ50"]
-    dataSF["pa_mean"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].mean()).reset_index()["paQ50"]
-    dataSF[['pa_whiskLow','pa_whiskHigh','pa_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk(row,data,"pa"),axis=1)])
+    data["pa"] = data.apply(lambda row: (row["tpm"]/dictBase[row["ID"]])*100 if row["ID"] in dictBase else np.nan,axis=1)
+
+    dataSF["pa_q25"] = pd.DataFrame(data.groupby(["sf"])["pa"].quantile(0.25)).reset_index()["pa"]
+    dataSF["pa_median"] = pd.DataFrame(data.groupby(["sf"])["pa"].quantile(0.50)).reset_index()["pa"]
+    dataSF["pa_q75"] = pd.DataFrame(data.groupby(["sf"])["pa"].quantile(0.75)).reset_index()["pa"]
+    dataSF["pa_mean"] = pd.DataFrame(data.groupby(["sf"])["pa"].mean()).reset_index()["pa"]
+    dataSF[['pa_whiskLow','pa_whiskHigh','pa_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk_slow(row,data,"pa"),axis=1)])
     dataSF["pa_numExtremes"] = dataSF.apply(lambda row: len(row["pa_extremes"]),axis=1)
-    dataSF["pa_fold23"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>200)and(extreme<300)]),axis=1)
-    dataSF["pa_fold34"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>300)and(extreme<400)]),axis=1)
-    dataSF["pa_fold45"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>400)and(extreme<500)]),axis=1)
-    dataSF["pa_fold5"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if extreme>500]),axis=1)
+    dataSF["pa_fold23"] = dataSF.apply(lambda row: len(data[(data["sf"]==row["sf"])&(data['pa']>200)&(data['pa']<300)]),axis=1)
+    dataSF["pa_fold34"] = dataSF.apply(lambda row: len(data[(data["sf"]==row["sf"])&(data['pa']>300)&(data['pa']<400)]),axis=1)
+    dataSF["pa_fold45"] = dataSF.apply(lambda row: len(data[(data["sf"]==row["sf"])&(data['pa']>400)&(data['pa']<500)]),axis=1)
+    dataSF["pa_fold5"] = dataSF.apply(lambda row: len(data[(data["sf"]==row["sf"])&(data['pa']>500)]),axis=1)
     dataSF["pa_weightedNumExtremes"] = dataSF.apply(lambda row: 0 if row["sf"] == 1.0 else abs(np.array(row["pa_extremes"])-row["pa_median"]).mean()*row["pa_numExtremes"],axis=1)
     dataSF["pa_weightedNormalizedNumExtremes"] = dataSF.apply(lambda row: row["pa_weightedNumExtremes"]/row["NumTranscripts"],axis=1)
-    dataSF["pa_std"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].std()).reset_index()["paQ50"]
+    dataSF["pa_std"] = pd.DataFrame(data.groupby(["sf"])["pa"].std()).reset_index()["pa"]
     dataSF["pa_cv"] = dataSF.apply(lambda row: (row["pa_std"]/row['pa_mean'])*100,axis=1)
 
-    # dataSF["tpm_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.25)).reset_index()["tpmMEAN"]
-    # dataSF["tpm_median"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.50)).reset_index()["tpmMEAN"]
-    # dataSF["tpm_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.75)).reset_index()["tpmMEAN"]
-    # dataSF["tpm_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].mean()).reset_index()["tpmMEAN"]
-    # dataSF[['tpm_whiskLow','tpm_whiskHigh','tpm_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk(row,data,"tpm"),axis=1)])
-    # dataSF["tpm_numExtremes"] = dataSF.apply(lambda row: len(row["tpm_extremes"]),axis=1)
-    # dataSF["tpm_weightedNumExtremes"] = dataSF.apply(lambda row: 0 if row["sf"] == 1.0 else abs(np.array(row["tpm_extremes"])-row["tpm_median"]).mean()*row["tpm_numExtremes"],axis=1)
-    # dataSF["tpm_weightedNormalizedNumExtremes"] = dataSF.apply(lambda row: row["tpm_weightedNumExtremes"]/row["NumTranscripts"],axis=1)
-    # dataSF["tpm_std"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].std()).reset_index()["tpmMEAN"]
-    # dataSF["tpm_cv"] = dataSF.apply(lambda row: (row["tpm_std"]/row['tpm_mean'])*100,axis=1)
+    dataSF["std_q25"] = pd.DataFrame(dataID.groupby(["sf"])["tpmSTD"].quantile(0.25)).reset_index()["tpmSTD"]
+    dataSF["std_median"] = pd.DataFrame(dataID.groupby(["sf"])["tpmSTD"].quantile(0.50)).reset_index()["tpmSTD"]
+    dataSF["std_q75"] = pd.DataFrame(dataID.groupby(["sf"])["tpmSTD"].quantile(0.75)).reset_index()["tpmSTD"]
+    dataSF["std_mean"] = pd.DataFrame(dataID.groupby(["sf"])["tpmSTD"].mean()).reset_index()["tpmSTD"]
+    dataSF[['std_whiskLow','std_whiskHigh','std_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskSTD(row,dataID,"std"),axis=1)])
 
-    dataSF["std_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.25)).reset_index()["tpmSTD"]
-    dataSF["std_median"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.50)).reset_index()["tpmSTD"]
-    dataSF["std_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.75)).reset_index()["tpmSTD"]
-    dataSF["std_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].mean()).reset_index()["tpmSTD"]
-    dataSF[['std_whiskLow','std_whiskHigh','std_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskSTD(row,data,"std"),axis=1)])
+    dataSF["cv_q25"] = pd.DataFrame(dataID.groupby(["sf"])["tpmCV"].quantile(0.25)).reset_index()["tpmCV"]
+    dataSF["cv_median"] = pd.DataFrame(dataID.groupby(["sf"])["tpmCV"].quantile(0.50)).reset_index()["tpmCV"]
+    dataSF["cv_q75"] = pd.DataFrame(dataID.groupby(["sf"])["tpmCV"].quantile(0.75)).reset_index()["tpmCV"]
+    dataSF["cv_mean"] = pd.DataFrame(dataID.groupby(["sf"])["tpmCV"].mean()).reset_index()["tpmCV"]
+    dataSF[['cv_whiskLow','cv_whiskHigh','cv_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,dataID,"cv"),axis=1)])
 
-    dataSF["cv_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.25)).reset_index()["tpmCV"]
-    dataSF["cv_median"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.50)).reset_index()["tpmCV"]
-    dataSF["cv_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.75)).reset_index()["tpmCV"]
-    dataSF["cv_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].mean()).reset_index()["tpmCV"]
-    dataSF[['cv_whiskLow','cv_whiskHigh','cv_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv"),axis=1)])
+    data["RankSampleID"] = data["ID"]+":"+data["sample"].astype(str)
 
-    data3["RankSampleID"] = data3["ID"]+":"+data3["sample"].astype(str)
-
-    dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
-    dataSF["tauTop10"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.1,True),axis=1)
-    dataSF["tauTop20"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.2,True),axis=1)
-    dataSF["tauTop50"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.5,True),axis=1)
-    dataSF["tauBottom10"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.1,False),axis=1)
-    dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
-    dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
-    print(" << Done Ranking and Tau coeeficient calculation")
+    dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
+    dataSF["tauTop10"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.1,True),axis=1)
+    dataSF["tauTop20"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.2,True),axis=1)
+    dataSF["tauTop50"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.5,True),axis=1)
+    dataSF["tauBottom10"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.1,False),axis=1)
+    dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
+    dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
     numUnique = len(data["ID"].unique())
+    minTPM = str(int(data[data['sf']==1.0]['tpm'].min()))
+    maxTPM = str(int(data[data['sf']==1.0]['tpm'].max()))
     if gene==True:
-        dataSF.columns = ['sf:'+str(numUnique)+':gene' if x=='sf' else x for x in list(dataSF)]
-        dataSF[["sf:"+str(numUnique)+":gene",
+        dataSF.columns = ['sf:'+minTPM+':'+maxTPM+':'+str(numUnique)+':gene' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+minTPM+":"+maxTPM+":"+str(numUnique)+":gene",
                 "falsePositives",
                 "falseNegatives",
                 "falseNegativesFull",
@@ -231,8 +236,8 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
                 "recall",
                 "precision"]].to_csv(outDir+"/csv/groupedGeneBySF.csv")
     else:
-        dataSF.columns = ['sf:'+str(numUnique)+':transcript' if x=='sf' else x for x in list(dataSF)]
-        dataSF[["sf:"+str(numUnique)+":transcript",
+        dataSF.columns = ['sf:'+minTPM+':'+maxTPM+':'+str(numUnique)+':transcript' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+minTPM+":"+maxTPM+":"+str(numUnique)+":transcript",
                 "falsePositives",
                 "falseNegatives",
                 "falseNegativesFull",
@@ -277,17 +282,13 @@ def readStatsSFRange(data1,data2,outDir,gene=False):
     # del data
     print("< Done grouping transcripts by downsampling factor")
 
-def readStatsSFFull(data1,data2,outDir,gene=False):
-    data=data2
-    data3=data1
-    cols = ['ID','covBase','tpmBase','falseNegative','tpmMEAN','paMEAN','sf']
-
-    dataOff = pd.unique(data3[(data3["sf"] == 1.0) & (data3["tpm"] == 0.0)]["ID"])
-    uniqueID1Maintain = pd.unique(data3[~data3["ID"].isin(dataOff)]["ID"])
+def readStatsSFFull_slow(data,dataID,outDir,gene=False):
+    dataOff = pd.unique(data[(data["sf"] == 1.0) & (data["tpm"] == 0.0)]["ID"])
+    uniqueID1Maintain = pd.unique(data[~data["ID"].isin(dataOff)]["ID"])
     del dataOff
-    dataN = data3[~data3["ID"].isin(uniqueID1Maintain)]
-    data3 = data3[data3["ID"].isin(uniqueID1Maintain)]
-    data3["lost"] = data3.apply(lambda row: row["tpm"] == 0.0,axis=1)
+    dataN = data[~data["ID"].isin(uniqueID1Maintain)]
+    data = data[data["ID"].isin(uniqueID1Maintain)]
+    data["lost"] = data.apply(lambda row: row["tpm"] == 0.0,axis=1)
 
     setTrueNeg = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]==0.0)]["ID"].unique()) # Lets try counting the number of false Positives
     setTruePos = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]!=0.0)]["ID"].unique()) # Lets try counting the number of false Positives
@@ -295,74 +296,66 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
     dataT = dataN[dataN['ID'].isin(setFalsePos)]
     del dataN
 
-    dataSF = pd.DataFrame(data[cols].groupby(['sf']).mean()).reset_index()
+    dataSF = pd.DataFrame(dataT.groupby(['sf']).mean()).reset_index()
     dataSF["falsePositives"] = dataSF.apply(lambda row: len(dataT[(dataT['ID'].isin(setFalsePos))&(dataT["tpm"]!=0.0)&(dataT["sf"]==row["sf"])]),axis=1)
-    setTruePos2 = set(data3[(data3["sf"]==1.0)]["ID"].unique()) # Lets try counting the number of true Positives
-    dataSF["truePositives"] = dataSF.apply(lambda row: len(data3[(data3['ID'].isin(setTruePos2))&(data3["tpm"]!=0.0)&(data3["sf"]==row["sf"])]),axis=1)
+    setTruePos2 = set(data[(data["sf"]==1.0)]["ID"].unique()) # Lets try counting the number of true Positives
+    dataSF["truePositives"] = dataSF.apply(lambda row: len(data[(data['ID'].isin(setTruePos2))&(data["tpm"]!=0.0)&(data["sf"]==row["sf"])]),axis=1)
     dataSF["precision"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falsePositives"])
 
-    dataSF["falseNegatives"] = dataSF.apply(lambda row: len(data3[(data3["sf"] == row["sf"])&(data3["lost"])]),axis=1)
+    dataSF["falseNegatives"] = dataSF.apply(lambda row: len(data[(data["sf"] == row["sf"])&(data["lost"])]),axis=1)
     dataSF["recall"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falseNegatives"])
 
-    dataLostAll = pd.DataFrame(data3.groupby(["ID","sf"]).mean()).reset_index()
+    dataLostAll = pd.DataFrame(data.groupby(["ID","sf"]).mean()).reset_index()
     dataSF["falseNegativesFull"] = dataSF.apply(lambda row: len(dataLostAll[(dataLostAll["sf"] == row["sf"])&(dataLostAll["lost"] == 1.0)]),axis=1)
     # 3 Calculating the total number of transcripts at a particular coverage point
-    dataSF["NumTranscripts"] = pd.DataFrame(data3.groupby(["sf"],as_index=False)["tpm"].count())["tpm"]
+    dataSF["NumTranscripts"] = pd.DataFrame(data.groupby(["sf"],as_index=False)["tpm"].count())["tpm"]
     # First we need to express tpm as percentage deviation from the baseTPM
-    dictBase = pd.Series(data3[data3["sf"]==1.0].tpm.values,index=data3[data3["sf"]==1.0].ID).to_dict()
+    dictBase = pd.Series(data[data["sf"]==1.0].tpm.values,index=data[data["sf"]==1.0].ID).to_dict()
 
-    dataSF["pa_q25"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.25)).reset_index()["paQ50"]
-    dataSF["pa_median"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.50)).reset_index()["paQ50"]
-    dataSF["pa_q75"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.75)).reset_index()["paQ50"]
-    dataSF["pa_mean"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].mean()).reset_index()["paQ50"]
-    dataSF[['pa_whiskLow','pa_whiskHigh','pa_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk(row,data,"pa"),axis=1)])
+    data["pa"] = data.apply(lambda row: (row["tpm"]/dictBase[row["ID"]])*100 if row["ID"] in dictBase else np.nan,axis=1)
+
+    dataSF["pa_q25"] = pd.DataFrame(data.groupby(["sf"])["pa"].quantile(0.25)).reset_index()["pa"]
+    dataSF["pa_median"] = pd.DataFrame(data.groupby(["sf"])["pa"].quantile(0.50)).reset_index()["pa"]
+    dataSF["pa_q75"] = pd.DataFrame(data.groupby(["sf"])["pa"].quantile(0.75)).reset_index()["pa"]
+    dataSF["pa_mean"] = pd.DataFrame(data.groupby(["sf"])["pa"].mean()).reset_index()["pa"]
+    dataSF[['pa_whiskLow','pa_whiskHigh','pa_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk_slow(row,data,"pa"),axis=1)])
     dataSF["pa_numExtremes"] = dataSF.apply(lambda row: len(row["pa_extremes"]),axis=1)
-    dataSF["pa_fold23"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>200)and(extreme<300)]),axis=1)
-    dataSF["pa_fold34"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>300)and(extreme<400)]),axis=1)
-    dataSF["pa_fold45"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if(extreme>400)and(extreme<500)]),axis=1)
-    dataSF["pa_fold5"] = dataSF.apply(lambda row: len([extreme for extreme in row["pa_extremes"] if extreme>500]),axis=1)
+    dataSF["pa_fold23"] = dataSF.apply(lambda row: len(data[(data["sf"]==row["sf"])&(data['pa']>200)&(data['pa']<300)]),axis=1)
+    dataSF["pa_fold34"] = dataSF.apply(lambda row: len(data[(data["sf"]==row["sf"])&(data['pa']>300)&(data['pa']<400)]),axis=1)
+    dataSF["pa_fold45"] = dataSF.apply(lambda row: len(data[(data["sf"]==row["sf"])&(data['pa']>400)&(data['pa']<500)]),axis=1)
+    dataSF["pa_fold5"] = dataSF.apply(lambda row: len(data[(data["sf"]==row["sf"])&(data['pa']>500)]),axis=1)
     dataSF["pa_weightedNumExtremes"] = dataSF.apply(lambda row: 0 if row["sf"] == 1.0 else abs(np.array(row["pa_extremes"])-row["pa_median"]).mean()*row["pa_numExtremes"],axis=1)
     dataSF["pa_weightedNormalizedNumExtremes"] = dataSF.apply(lambda row: row["pa_weightedNumExtremes"]/row["NumTranscripts"],axis=1)
-    dataSF["pa_std"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].std()).reset_index()["paQ50"]
+    dataSF["pa_std"] = pd.DataFrame(data.groupby(["sf"])["pa"].std()).reset_index()["pa"]
     dataSF["pa_cv"] = dataSF.apply(lambda row: (row["pa_std"]/row['pa_mean'])*100,axis=1)
 
-    # dataSF["tpm_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.25)).reset_index()["tpmMEAN"]
-    # dataSF["tpm_median"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.50)).reset_index()["tpmMEAN"]
-    # dataSF["tpm_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].quantile(0.75)).reset_index()["tpmMEAN"]
-    # dataSF["tpm_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].mean()).reset_index()["tpmMEAN"]
-    # dataSF[['tpm_whiskLow','tpm_whiskHigh','tpm_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk(row,data,"tpm"),axis=1)])
-    # dataSF["tpm_numExtremes"] = dataSF.apply(lambda row: len(row["tpm_extremes"]),axis=1)
-    # dataSF["tpm_weightedNumExtremes"] = dataSF.apply(lambda row: 0 if row["sf"] == 1.0 else abs(np.array(row["tpm_extremes"])-row["tpm_median"]).mean()*row["tpm_numExtremes"],axis=1)
-    # dataSF["tpm_weightedNormalizedNumExtremes"] = dataSF.apply(lambda row: row["tpm_weightedNumExtremes"]/row["NumTranscripts"],axis=1)
-    # dataSF["tpm_std"] = pd.DataFrame(data.groupby(["sf"])["tpmMEAN"].std()).reset_index()["tpmMEAN"]
-    # dataSF["tpm_cv"] = dataSF.apply(lambda row: (row["tpm_std"]/row['tpm_mean'])*100,axis=1)
+    dataSF["std_q25"] = pd.DataFrame(dataID.groupby(["sf"])["tpmSTD"].quantile(0.25)).reset_index()["tpmSTD"]
+    dataSF["std_median"] = pd.DataFrame(dataID.groupby(["sf"])["tpmSTD"].quantile(0.50)).reset_index()["tpmSTD"]
+    dataSF["std_q75"] = pd.DataFrame(dataID.groupby(["sf"])["tpmSTD"].quantile(0.75)).reset_index()["tpmSTD"]
+    dataSF["std_mean"] = pd.DataFrame(dataID.groupby(["sf"])["tpmSTD"].mean()).reset_index()["tpmSTD"]
+    dataSF[['std_whiskLow','std_whiskHigh','std_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskSTD(row,dataID,"std"),axis=1)])
 
-    dataSF["std_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.25)).reset_index()["tpmSTD"]
-    dataSF["std_median"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.50)).reset_index()["tpmSTD"]
-    dataSF["std_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.75)).reset_index()["tpmSTD"]
-    dataSF["std_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].mean()).reset_index()["tpmSTD"]
-    dataSF[['std_whiskLow','std_whiskHigh','std_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskSTD(row,data,"std"),axis=1)])
+    dataSF["cv_q25"] = pd.DataFrame(dataID.groupby(["sf"])["tpmCV"].quantile(0.25)).reset_index()["tpmCV"]
+    dataSF["cv_median"] = pd.DataFrame(dataID.groupby(["sf"])["tpmCV"].quantile(0.50)).reset_index()["tpmCV"]
+    dataSF["cv_q75"] = pd.DataFrame(dataID.groupby(["sf"])["tpmCV"].quantile(0.75)).reset_index()["tpmCV"]
+    dataSF["cv_mean"] = pd.DataFrame(dataID.groupby(["sf"])["tpmCV"].mean()).reset_index()["tpmCV"]
+    dataSF[['cv_whiskLow','cv_whiskHigh','cv_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,dataID,"cv"),axis=1)])
 
-    dataSF["cv_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.25)).reset_index()["tpmCV"]
-    dataSF["cv_median"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.50)).reset_index()["tpmCV"]
-    dataSF["cv_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.75)).reset_index()["tpmCV"]
-    dataSF["cv_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].mean()).reset_index()["tpmCV"]
-    dataSF[['cv_whiskLow','cv_whiskHigh','cv_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv"),axis=1)])
+    data["RankSampleID"] = data["ID"]+":"+data["sample"].astype(str)
 
-    data3["RankSampleID"] = data3["ID"]+":"+data3["sample"].astype(str)
-
-    dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
-    dataSF["tauTop10"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.1,True),axis=1)
-    dataSF["tauTop20"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.2,True),axis=1)
-    dataSF["tauTop50"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.5,True),axis=1)
-    dataSF["tauBottom10"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.1,False),axis=1)
-    dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
-    dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
-    print(" << Done Ranking and Tau coeeficient calculation")
+    dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
+    dataSF["tauTop10"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.1,True),axis=1)
+    dataSF["tauTop20"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.2,True),axis=1)
+    dataSF["tauTop50"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.5,True),axis=1)
+    dataSF["tauBottom10"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.1,False),axis=1)
+    dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
+    dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data[data["sf"] == row["sf"]][["RankSampleID","tpm"]],data[data["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
     numUnique = len(data["ID"].unique())
+    minTPM = str(int(data[data['sf']==1.0]['tpm'].min()))
+    maxTPM = str(int(data[data['sf']==1.0]['tpm'].max()))
     if gene==True:
-        dataSF.columns = ['sf:'+str(numUnique)+':gene' if x=='sf' else x for x in list(dataSF)]
-        dataSF[["sf:"+str(numUnique)+":gene",
+        dataSF.columns = ['sf:'+minTPM+':'+maxTPM+':'+str(numUnique)+':gene' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+minTPM+":"+maxTPM+":"+str(numUnique)+":gene",
                 "falsePositives",
                 "falseNegatives",
                 "falseNegativesFull",
@@ -403,8 +396,332 @@ def readStatsSFFull(data1,data2,outDir,gene=False):
                 "recall",
                 "precision"]].to_csv(outDir+"/csv/groupedGeneBySF.csv")
     else:
-        dataSF.columns = ['sf:'+str(numUnique)+':transcript' if x=='sf' else x for x in list(dataSF)]
-        dataSF[["sf:"+str(numUnique)+":transcript",
+        dataSF.columns = ['sf:'+minTPM+':'+maxTPM+':'+str(numUnique)+':transcript' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+minTPM+":"+maxTPM+":"+str(numUnique)+":transcript",
+                "falsePositives",
+                "falseNegatives",
+                "falseNegativesFull",
+                "NumTranscripts",
+                "pa_q25",
+                "pa_median",
+                "pa_q75",
+                "pa_mean",
+                "pa_whiskLow",
+                "pa_whiskHigh",
+                "pa_weightedNumExtremes",
+                "pa_weightedNormalizedNumExtremes",
+                "pa_std",
+                "pa_cv",
+                "pa_fold23",
+                "pa_fold34",
+                "pa_fold45",
+                "pa_fold5",
+                "std_q25",
+                "std_median",
+                "std_q75",
+                "std_mean",
+                "std_whiskLow",
+                "std_whiskHigh",
+                "cv_q25",
+                "cv_median",
+                "cv_q75",
+                "cv_mean",
+                "cv_whiskLow",
+                "cv_whiskHigh",
+                "tauFull",
+                "tauTop10",
+                "tauTop20",
+                "tauTop50",
+                "tauBottom10",
+                "tauBottom20",
+                "tauBottom50",
+                "recall",
+                "precision"]].to_csv(outDir+"/csv/groupedTranscriptBySF.csv")
+
+    del dataSF
+    print("< Done grouping transcripts by downsampling factor")
+
+
+################################################################
+# Older version of the code uses mean TPM values from the output of readStatsID which.
+# Now will be rewriting the code to include the real tpm values
+################################################################
+
+def readStatsSFRange_fast(data1,data2,outDir,gene=False):
+    data=data2
+    data3=data1
+    cols = ['ID','covBase','tpmBase','falseNegative','tpmMEAN','paMEAN','sf']
+
+    dataOff = pd.unique(data3[(data3["sf"] == 1.0) & (data3["tpm"] == 0.0)]["ID"])
+    uniqueID1Maintain = pd.unique(data3[~data3["ID"].isin(dataOff)]["ID"])
+    del dataOff
+    dataN = data3[~data3["ID"].isin(uniqueID1Maintain)]
+    data3 = data3[data3["ID"].isin(uniqueID1Maintain)]
+    data3["lost"] = data3.apply(lambda row: row["tpm"] == 0.0,axis=1)
+
+    setTrueNeg = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]==0.0)]["ID"].unique()) # Lets try counting the number of false Positives
+    setTruePos = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]!=0.0)]["ID"].unique()) # Lets try counting the number of false Positives
+    setFalsePos = list(setTrueNeg.difference(setTruePos)) # Lets try counting the number of falsePositives
+
+    dataSF = pd.DataFrame(data[cols].groupby(['sf']).mean()).reset_index()
+    dataSF["falsePositives"] = np.nan
+    dataSF["recall"] = np.nan
+
+    dataSF["falseNegatives"] = dataSF.apply(lambda row: len(data3[(data3["sf"] == row["sf"])&(data3["lost"])]),axis=1)
+    dataLostAll = pd.DataFrame(data3.groupby(["ID","sf"]).mean()).reset_index()
+    dataSF["falseNegativesFull"] = dataSF.apply(lambda row: len(dataLostAll[(dataLostAll["sf"] == row["sf"])&(dataLostAll["lost"] == 1.0)]),axis=1)
+    dataSF["NumTranscripts"] = pd.DataFrame(data3.groupby(["sf"],as_index=False)["tpm"].count())["tpm"]
+    dataSF["precision"] = (dataSF["NumTranscripts"]-dataSF["falseNegatives"])/dataSF["NumTranscripts"]
+    dictBase = pd.Series(data3[data3["sf"]==1.0].tpm.values,index=data3[data3["sf"]==1.0].ID).to_dict()
+
+    dataSF["pa_q25"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.25)).reset_index()["paQ50"]
+    dataSF["pa_median"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.50)).reset_index()["paQ50"]
+    dataSF["pa_q75"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.75)).reset_index()["paQ50"]
+    dataSF["pa_mean"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].mean()).reset_index()["paQ50"]
+    dataSF[['pa_whiskLow','pa_whiskHigh','pa_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk(row,data,"pa"),axis=1)])
+    dataSF["pa_numExtremes"] = dataSF.apply(lambda row: len(row["pa_extremes"]),axis=1)
+    dataSF["pa_fold23"] = dataSF.apply(lambda row: len(data3[(data3["sf"]==row["sf"])&(data3['pa']>200)&(data3['pa']<300)]),axis=1)
+    dataSF["pa_fold34"] = dataSF.apply(lambda row: len(data3[(data3["sf"]==row["sf"])&(data3['pa']>300)&(data3['pa']<400)]),axis=1)
+    dataSF["pa_fold45"] = dataSF.apply(lambda row: len(data3[(data3["sf"]==row["sf"])&(data3['pa']>400)&(data3['pa']<500)]),axis=1)
+    dataSF["pa_fold5"] = dataSF.apply(lambda row: len(data3[(data3["sf"]==row["sf"])&(data3['pa']>500)]),axis=1)
+    dataSF["pa_weightedNumExtremes"] = dataSF.apply(lambda row: 0 if row["sf"] == 1.0 else abs(np.array(row["pa_extremes"])-row["pa_median"]).mean()*row["pa_numExtremes"],axis=1)
+    dataSF["pa_weightedNormalizedNumExtremes"] = dataSF.apply(lambda row: row["pa_weightedNumExtremes"]/row["NumTranscripts"],axis=1)
+    dataSF["pa_std"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].std()).reset_index()["paQ50"]
+    dataSF["pa_cv"] = dataSF.apply(lambda row: (row["pa_std"]/row['pa_mean'])*100,axis=1)
+
+    dataSF["std_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.25)).reset_index()["tpmSTD"]
+    dataSF["std_median"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.50)).reset_index()["tpmSTD"]
+    dataSF["std_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.75)).reset_index()["tpmSTD"]
+    dataSF["std_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].mean()).reset_index()["tpmSTD"]
+    dataSF[['std_whiskLow','std_whiskHigh','std_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskSTD(row,data,"std"),axis=1)])
+
+    dataSF["cv_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.25)).reset_index()["tpmCV"]
+    dataSF["cv_median"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.50)).reset_index()["tpmCV"]
+    dataSF["cv_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.75)).reset_index()["tpmCV"]
+    dataSF["cv_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].mean()).reset_index()["tpmCV"]
+    dataSF[['cv_whiskLow','cv_whiskHigh','cv_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv"),axis=1)])
+
+    data3["RankSampleID"] = data3["ID"]+":"+data3["sample"].astype(str)
+
+    dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
+    dataSF["tauTop10"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.1,True),axis=1)
+    dataSF["tauTop20"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.2,True),axis=1)
+    dataSF["tauTop50"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.5,True),axis=1)
+    dataSF["tauBottom10"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.1,False),axis=1)
+    dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
+    dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
+    print(" << Done Ranking and Tau coeeficient calculation")
+    numUnique = len(data["ID"].unique())
+    minTPM = str(int(data3[data3['sf']==1.0]['tpm'].min()))
+    maxTPM = str(int(data3[data3['sf']==1.0]['tpm'].max()))
+    if gene==True:
+        dataSF.columns = ['sf:'+minTPM+':'+maxTPM+':'+str(numUnique)+':gene' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+minTPM+":"+maxTPM+":"+str(numUnique)+":gene",
+                "falsePositives",
+                "falseNegatives",
+                "falseNegativesFull",
+                "NumTranscripts",
+                "pa_q25",
+                "pa_median",
+                "pa_q75",
+                "pa_mean",
+                "pa_whiskLow",
+                "pa_whiskHigh",
+                "pa_weightedNumExtremes",
+                "pa_weightedNormalizedNumExtremes",
+                "pa_std",
+                "pa_cv",
+                "pa_fold23",
+                "pa_fold34",
+                "pa_fold45",
+                "pa_fold5",
+                "std_q25",
+                "std_median",
+                "std_q75",
+                "std_mean",
+                "std_whiskLow",
+                "std_whiskHigh",
+                "cv_q25",
+                "cv_median",
+                "cv_q75",
+                "cv_mean",
+                "cv_whiskLow",
+                "cv_whiskHigh",
+                "tauFull",
+                "tauTop10",
+                "tauTop20",
+                "tauTop50",
+                "tauBottom10",
+                "tauBottom20",
+                "tauBottom50",
+                "recall",
+                "precision"]].to_csv(outDir+"/csv/groupedGeneBySF.csv")
+    else:
+        dataSF.columns = ['sf:'+minTPM+':'+maxTPM+':'+str(numUnique)+':transcript' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+minTPM+":"+maxTPM+":"+str(numUnique)+":transcript",
+                "falsePositives",
+                "falseNegatives",
+                "falseNegativesFull",
+                "NumTranscripts",
+                "pa_q25",
+                "pa_median",
+                "pa_q75",
+                "pa_mean",
+                "pa_whiskLow",
+                "pa_whiskHigh",
+                "pa_weightedNumExtremes",
+                "pa_weightedNormalizedNumExtremes",
+                "pa_std",
+                "pa_cv",
+                "pa_fold23",
+                "pa_fold34",
+                "pa_fold45",
+                "pa_fold5",
+                "std_q25",
+                "std_median",
+                "std_q75",
+                "std_mean",
+                "std_whiskLow",
+                "std_whiskHigh",
+                "cv_q25",
+                "cv_median",
+                "cv_q75",
+                "cv_mean",
+                "cv_whiskLow",
+                "cv_whiskHigh",
+                "tauFull",
+                "tauTop10",
+                "tauTop20",
+                "tauTop50",
+                "tauBottom10",
+                "tauBottom20",
+                "tauBottom50",
+                "recall",
+                "precision"]].to_csv(outDir+"/csv/groupedTranscriptBySF.csv")
+
+    del dataSF
+    # del data
+    print("< Done grouping transcripts by downsampling factor")
+
+def readStatsSFFull_fast(data1,data2,outDir,gene=False):
+    data=data2
+    data3=data1
+    cols = ['ID','covBase','tpmBase','falseNegative','tpmMEAN','paMEAN','sf']
+
+    dataOff = pd.unique(data3[(data3["sf"] == 1.0) & (data3["tpm"] == 0.0)]["ID"])
+    uniqueID1Maintain = pd.unique(data3[~data3["ID"].isin(dataOff)]["ID"])
+    del dataOff
+    dataN = data3[~data3["ID"].isin(uniqueID1Maintain)]
+    data3 = data3[data3["ID"].isin(uniqueID1Maintain)]
+    data3["lost"] = data3.apply(lambda row: row["tpm"] == 0.0,axis=1)
+
+    setTrueNeg = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]==0.0)]["ID"].unique()) # Lets try counting the number of false Positives
+    setTruePos = set(dataN[(dataN["sf"]==1.0)&(dataN["tpm"]!=0.0)]["ID"].unique()) # Lets try counting the number of false Positives
+    setFalsePos = list(setTrueNeg.difference(setTruePos)) # Lets try counting the number of falsePositives
+    dataT = dataN[dataN['ID'].isin(setFalsePos)]
+    del dataN
+
+    dataSF = pd.DataFrame(data[cols].groupby(['sf']).mean()).reset_index()
+    dataSF["falsePositives"] = dataSF.apply(lambda row: len(dataT[(dataT['ID'].isin(setFalsePos))&(dataT["tpm"]!=0.0)&(dataT["sf"]==row["sf"])]),axis=1)
+    setTruePos2 = set(data3[(data3["sf"]==1.0)]["ID"].unique()) # Lets try counting the number of true Positives
+    dataSF["truePositives"] = dataSF.apply(lambda row: len(data3[(data3['ID'].isin(setTruePos2))&(data3["tpm"]!=0.0)&(data3["sf"]==row["sf"])]),axis=1)
+    dataSF["precision"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falsePositives"])
+
+    dataSF["falseNegatives"] = dataSF.apply(lambda row: len(data3[(data3["sf"] == row["sf"])&(data3["lost"])]),axis=1)
+    dataSF["recall"] = dataSF['truePositives']/(dataSF["truePositives"]+dataSF["falseNegatives"])
+
+    dataLostAll = pd.DataFrame(data3.groupby(["ID","sf"]).mean()).reset_index()
+    dataSF["falseNegativesFull"] = dataSF.apply(lambda row: len(dataLostAll[(dataLostAll["sf"] == row["sf"])&(dataLostAll["lost"] == 1.0)]),axis=1)
+    # 3 Calculating the total number of transcripts at a particular coverage point
+    dataSF["NumTranscripts"] = pd.DataFrame(data3.groupby(["sf"],as_index=False)["tpm"].count())["tpm"]
+    # First we need to express tpm as percentage deviation from the baseTPM
+    dictBase = pd.Series(data3[data3["sf"]==1.0].tpm.values,index=data3[data3["sf"]==1.0].ID).to_dict()
+
+    dataSF["pa_q25"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.25)).reset_index()["paQ50"]
+    dataSF["pa_median"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.50)).reset_index()["paQ50"]
+    dataSF["pa_q75"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].quantile(0.75)).reset_index()["paQ50"]
+    dataSF["pa_mean"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].mean()).reset_index()["paQ50"]
+    dataSF[['pa_whiskLow','pa_whiskHigh','pa_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhisk(row,data,"pa"),axis=1)])
+    dataSF["pa_numExtremes"] = dataSF.apply(lambda row: len(row["pa_extremes"]),axis=1)
+    dataSF["pa_fold23"] = dataSF.apply(lambda row: len(data3[(data3["sf"]==row["sf"])&(data3['pa']>200)&(data3['pa']<300)]),axis=1)
+    dataSF["pa_fold34"] = dataSF.apply(lambda row: len(data3[(data3["sf"]==row["sf"])&(data3['pa']>300)&(data3['pa']<400)]),axis=1)
+    dataSF["pa_fold45"] = dataSF.apply(lambda row: len(data3[(data3["sf"]==row["sf"])&(data3['pa']>400)&(data3['pa']<500)]),axis=1)
+    dataSF["pa_fold5"] = dataSF.apply(lambda row: len(data3[(data3["sf"]==row["sf"])&(data3['pa']>500)]),axis=1)
+    dataSF["pa_weightedNumExtremes"] = dataSF.apply(lambda row: 0 if row["sf"] == 1.0 else abs(np.array(row["pa_extremes"])-row["pa_median"]).mean()*row["pa_numExtremes"],axis=1)
+    dataSF["pa_weightedNormalizedNumExtremes"] = dataSF.apply(lambda row: row["pa_weightedNumExtremes"]/row["NumTranscripts"],axis=1)
+    dataSF["pa_std"] = pd.DataFrame(data.groupby(["sf"])["paQ50"].std()).reset_index()["paQ50"]
+    dataSF["pa_cv"] = dataSF.apply(lambda row: (row["pa_std"]/row['pa_mean'])*100,axis=1)
+
+    dataSF["std_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.25)).reset_index()["tpmSTD"]
+    dataSF["std_median"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.50)).reset_index()["tpmSTD"]
+    dataSF["std_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].quantile(0.75)).reset_index()["tpmSTD"]
+    dataSF["std_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmSTD"].mean()).reset_index()["tpmSTD"]
+    dataSF[['std_whiskLow','std_whiskHigh','std_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskSTD(row,data,"std"),axis=1)])
+
+    dataSF["cv_q25"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.25)).reset_index()["tpmCV"]
+    dataSF["cv_median"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.50)).reset_index()["tpmCV"]
+    dataSF["cv_q75"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].quantile(0.75)).reset_index()["tpmCV"]
+    dataSF["cv_mean"] = pd.DataFrame(data.groupby(["sf"])["tpmCV"].mean()).reset_index()["tpmCV"]
+    dataSF[['cv_whiskLow','cv_whiskHigh','cv_extremes']] = pd.DataFrame([x for x in dataSF.apply(lambda row: calcWhiskCV(row,data,"cv"),axis=1)])
+
+    data3["RankSampleID"] = data3["ID"]+":"+data3["sample"].astype(str)
+
+    dataSF["tauFull"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],1.0,True),axis=1)
+    dataSF["tauTop10"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.1,True),axis=1)
+    dataSF["tauTop20"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.2,True),axis=1)
+    dataSF["tauTop50"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.5,True),axis=1)
+    dataSF["tauBottom10"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.1,False),axis=1)
+    dataSF["tauBottom20"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.2,False),axis=1)
+    dataSF["tauBottom50"] = dataSF.apply(lambda row: KendalTau(data3[data3["sf"] == row["sf"]][["RankSampleID","tpm"]],data3[data3["sf"] == 1.0][["RankSampleID","tpm"]],0.5,False),axis=1)
+    print(" << Done Ranking and Tau coeeficient calculation")
+    numUnique = len(data["ID"].unique())
+    minTPM = str(int(data3[data3['sf']==1.0]['tpm'].min()))
+    maxTPM = str(int(data3[data3['sf']==1.0]['tpm'].max()))
+    if gene==True:
+        dataSF.columns = ['sf:'+minTPM+':'+maxTPM+':'+str(numUnique)+':gene' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+minTPM+":"+maxTPM+":"+str(numUnique)+":gene",
+                "falsePositives",
+                "falseNegatives",
+                "falseNegativesFull",
+                "NumTranscripts",
+                "pa_q25",
+                "pa_median",
+                "pa_q75",
+                "pa_mean",
+                "pa_whiskLow",
+                "pa_whiskHigh",
+                "pa_weightedNumExtremes",
+                "pa_weightedNormalizedNumExtremes",
+                "pa_std",
+                "pa_cv",
+                "pa_fold23",
+                "pa_fold34",
+                "pa_fold45",
+                "pa_fold5",
+                "std_q25",
+                "std_median",
+                "std_q75",
+                "std_mean",
+                "std_whiskLow",
+                "std_whiskHigh",
+                "cv_q25",
+                "cv_median",
+                "cv_q75",
+                "cv_mean",
+                "cv_whiskLow",
+                "cv_whiskHigh",
+                "tauFull",
+                "tauTop10",
+                "tauTop20",
+                "tauTop50",
+                "tauBottom10",
+                "tauBottom20",
+                "tauBottom50",
+                "recall",
+                "precision"]].to_csv(outDir+"/csv/groupedGeneBySF.csv")
+    else:
+        dataSF.columns = ['sf:'+minTPM+':'+maxTPM+':'+str(numUnique)+':transcript' if x=='sf' else x for x in list(dataSF)]
+        dataSF[["sf:"+minTPM+":"+maxTPM+":"+str(numUnique)+":transcript",
                 "falsePositives",
                 "falseNegatives",
                 "falseNegativesFull",
@@ -637,24 +954,26 @@ def main(args):
         try:
             iqrC = float(args.coverage)
             # lets try identifying upper outliers in covBase
-            q25,q50,q75 = data['cov'].quantile([0.25,0.5,0.75])
+            dataHLD = data[data['sf']==1.0]
+            q25,q50,q75 = dataHLD['tpm'].quantile([0.25,0.5,0.75])
             iqr = q75-q25
             thw = q75+iqrC*iqr
             tlw = q25-iqrC*iqr
-            ahw = data[data["cov"]<thw]["cov"].max()
-            alw = data[data["cov"]>tlw]["cov"].min()
-            transcs = data[(data['cov']<ahw)&(data['cov']>alw)&(data["sf"]==1.0)]["ID"].unique()
+            ahw = dataHLD[dataHLD["tpm"]<thw]["tpm"].max()
+            alw = dataHLD[dataHLD["tpm"]>tlw]["tpm"].min()
+            transcs = dataHLD[(dataHLD['tpm']<ahw)&(dataHLD['tpm']>alw)]["ID"].unique()
             data = data[data["ID"].isin(transcs)]
             data.reset_index(inplace=True)
             data = data.drop("index",axis=1)
             full = False
+            del dataHLD
         except:
             if args.coverage == "full":
                 full = True
             else:
                 try:
                     bounds = args.coverage.split(":")
-                    transcripts = data[(data['cov']<float(bounds[1]))&(data['cov']>float(bounds[0]))&(data["sf"]==1.0)]["ID"].unique()
+                    transcripts = data[(data['tpm']<float(bounds[1]))&(data['tpm']>float(bounds[0]))&(data["sf"]==1.0)]["ID"].unique()
                     data = data[data["ID"].isin(transcripts)]
                     data.reset_index(inplace=True)
                     data = data.drop("index",axis=1)
@@ -673,9 +992,15 @@ def main(args):
         dataIDBASE = readStatsID(data,os.path.abspath(args.out))
 
         if full and args.top == None:
-            readStatsSFFull(data,dataIDBASE,os.path.abspath(args.out))
+            if args.fast:
+                readStatsSFFull_fast(data,dataIDBASE,os.path.abspath(args.out))
+            else:
+                readStatsSFFull_slow(data,dataIDBASE,os.path.abspath(args.out))
         else:
-            readStatsSFRange(data,dataIDBASE,os.path.abspath(args.out))
+            if args.fast:
+                readStatsSFRange_fast(data,dataIDBASE,os.path.abspath(args.out))
+            else:
+                readStatsSFRange_slow(data,dataIDBASE,os.path.abspath(args.out))
 
         if args.de == True:
             readStatsStudentTest(data,os.path.abspath(args.out))
@@ -689,24 +1014,26 @@ def main(args):
         try:
             iqrC = float(args.coverage)
             # lets try identifying upper outliers in covBase
-            q25,q50,q75 = data['cov'].quantile([0.25,0.5,0.75])
+            dataHLD = data[data['sf']==1.0]
+            q25,q50,q75 = dataHLD['tpm'].quantile([0.25,0.5,0.75])
             iqr = q75-q25
             thw = q75+iqrC*iqr
             tlw = q25-iqrC*iqr
-            ahw = data[data["cov"]<thw]["cov"].max()
-            alw = data[data["cov"]>tlw]["cov"].min()
-            transcs = data[(data['cov']<ahw)&(data['cov']>alw)&(data["sf"]==1.0)]["ID"].unique()
-            data = data[data["ID"].isin(transcs)]
+            ahw = dataHLD[dataHLD["tpm"]<thw]["tpm"].max()
+            alw = dataHLD[dataHLD["tpm"]>tlw]["tpm"].min()
+            genes = dataHLD[(dataHLD['tpm']<ahw)&(dataHLD['tpm']>alw)]["ID"].unique()
+            data = data[data["ID"].isin(genes)]
             data.reset_index(inplace=True)
             data = data.drop("index",axis=1)
             full = False
+            del dataHLD
         except:
             if args.coverage == "full":
                 full = True
             else:
                 try:
                     bounds = args.coverage.split(":")
-                    transcripts = data[(data['cov']<float(bounds[1]))&(data['cov']>float(bounds[0]))&(data["sf"]==1.0)]["ID"].unique()
+                    transcripts = data[(data['tpm']<float(bounds[1]))&(data['tpm']>float(bounds[0]))&(data["sf"]==1.0)]["ID"].unique()
                     data = data[data["ID"].isin(transcripts)]
                     data.reset_index(inplace=True)
                     data = data.drop("index",axis=1)
@@ -725,9 +1052,15 @@ def main(args):
         dataIDBASE = readStatsID(data,os.path.abspath(args.out),True)
 
         if full and args.top == None:
-            readStatsSFFull(data,dataIDBASE,os.path.abspath(args.out),True)
+            if args.fast:
+                readStatsSFFull_fast(data,dataIDBASE,os.path.abspath(args.out),True)
+            else:
+                readStatsSFFull_slow(data,dataIDBASE,os.path.abspath(args.out),True)
         else:
-            readStatsSFRange(data,dataIDBASE,os.path.abspath(args.out),True)
+            if args.fast:
+                readStatsSFRange_fast(data,dataIDBASE,os.path.abspath(args.out),True)
+            else:
+                readStatsSFRange_slow(data,dataIDBASE,os.path.abspath(args.out),True)
 
         if args.de == True:
             readStatsStudentTest(data,os.path.abspath(args.out),True)

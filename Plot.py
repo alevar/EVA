@@ -216,14 +216,15 @@ def plotPrecision_VS_Recall(data,outDir,res,level,numUnique):
 #===========================================================
 #===========================================================
 
-def plotPubSF(data,outDir,res,param,level,measure,numUnique):
+def plotPubSF(data,outDir,res,param,level,measure,numUnique,minTPM,maxTPM):
     #########################################################
     #########################################################
     plt.close('all')
     plt.clf()
+    sbn.set_style("ticks")
     fig = plt.figure(figsize=(int(res[0]),int(res[1])))
     ax1 = fig.add_axes((0.11,0.11,0.85,0.79))
-    ax1.set_title('Change in variation of'+level+' expression ('+measure+') based on a '+level+'-level assembly of '+str(numUnique)+' '+level+'s')
+    ax1.set_title('Change in variation of'+level+' expression ('+measure+') based on a '+level+'-level assembly of '+str(numUnique)+' '+level+'s ('+minTPM+'<TPM<'+maxTPM+')')
     ax1.set_ylabel('Variation in '+level+'-level expression estimation ('+measure+')')
     ax1.plot(data["sf"], data[param+"_median"],'k',color='#CC4F1B')
     ax1.set_xlim(data["sf"].min(),data["sf"].max())
@@ -267,11 +268,10 @@ def plotPubSF(data,outDir,res,param,level,measure,numUnique):
     host.set_xticklabels(ticks2F)
     host.set_title('Recall & Fold Change of '+level+'-level assembly of '+str(numUnique)+' '+level+'s')
     par1.set_ylabel('Fraction of expressed '+level+'s compared to full assembly (Recall)')
-    host.set_ylabel("# "+level+"s with TPM fold change > 2 compared to full assembly")
+    host.set_ylabel("Fraction of "+level+"s with TPM fold change > 2 compared to full assembly")
 
     p1, = par1.plot(data["sf"], data["recall"], label="Recall",c=sbn.color_palette("muted")[0])
-    p2, = host.plot(data["sf"].tolist(),data["pa_fold23"]+data["pa_fold34"]+data["pa_fold45"]+data["pa_fold5"], label="Fold",c=sbn.color_palette("muted")[1])
-
+    p2, = host.plot(data["sf"].tolist(),(data["pa_fold23"]+data["pa_fold34"]+data["pa_fold45"]+data["pa_fold5"])/data['NumTranscripts'], label="Fold",c=sbn.color_palette("muted")[1])
     host.spines['top'].set_visible(False)
     par1.spines['top'].set_visible(False)
     par1.spines['right'].set_color(p1.get_color())
@@ -570,6 +570,8 @@ def main(args):
         dataSF = pd.read_csv(os.path.abspath(args.sf)).drop("Unnamed: 0",axis=1)
         level = list(dataSF)[0].split(":")[-1]
         numUnique = list(dataSF)[0].split(":")[-2]
+        maxVal = list(dataSF)[0].split(":")[-3]
+        minVal = list(dataSF)[0].split(":")[-4]
         dataSF.columns = headersSF
         plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"pa",level,"%TPM",numUnique)
         plotBoxSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"std",level,"Standard Deviation",numUnique)
@@ -578,15 +580,13 @@ def main(args):
         plotFold(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
         if (len(dataSF["recall"].unique()) == 1) and np.isnan(dataSF["recall"].unique().tolist()[0]):
             dataSF.fillna(0,inplace=True)
-            plotScattermatrixSFRange(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
             plotPCARange(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
             plotPrecision(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
         else:
-            plotScattermatrixSFFull(dataSF,os.path.abspath(args.out),args.resolution.split(":"))
             plotPCAFull(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
             plotPrecision_VS_Recall(dataSF,os.path.abspath(args.out),args.resolution.split(":"),level,numUnique)
 
-        plotPubSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"pa",level,"%TPM",numUnique)
+        plotPubSF(dataSF,os.path.abspath(args.out),args.resolution.split(":"),"pa",level,"%TPM",numUnique,minVal,maxVal)
         del dataSF
 
     if not args.id == None:
